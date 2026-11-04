@@ -1,0 +1,11 @@
+[functions.vimeo-fetch]
+verify_jwt = false
+
+[functions.fetch-vimeo]
+verify_jwt = false
+
+[functions.admin-ops]
+verify_jwt = true
+
+[functions.archive-fill]
+verify_jwt = false

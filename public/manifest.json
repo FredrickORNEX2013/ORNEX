@@ -1,0 +1,11 @@
+{
+  "name": "ORNEX",
+  "short_name": "ORNEX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#7B2FFF",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml" }
+  ]
+}

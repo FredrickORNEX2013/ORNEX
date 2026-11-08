@@ -1,29 +1,82 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ORNEX</title>
-<style>
-body{margin:0;background:#000;color:#fff;font-family:Arial,sans-serif;text-align:center}
-.wrap{padding:40px 20px}
-h1{font-size:60px;letter-spacing:8px;margin:10px 0;color:#FFD700}
-p{color:#ccc}
-.btn{display:block;background:#FFD700;color:#000;padding:16px;margin:15px auto;max-width:320px;border-radius:12px;font-weight:bold;text-decoration:none;font-size:18px}
-.btn2{background:#222;color:#fff;border:1px solid #444}
-video{width:100%;max-width:400px;border-radius:12px;margin-top:20px}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Welcome to ORNEX.">
+  <title>ORNEX</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #000;
+      color: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background: #000;
+      text-align: center;
+    }
+
+    main {
+      width: min(100% - 32px, 720px);
+      margin: 0 auto;
+      padding: clamp(48px, 10vh, 96px) 0 56px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #ffd700;
+      font-size: clamp(3rem, 12vw, 5rem);
+      letter-spacing: .14em;
+    }
+
+    p { color: #ccc; line-height: 1.6; }
+
+    .button {
+      display: inline-block;
+      margin: 18px 0 8px;
+      padding: 15px 26px;
+      border: 2px solid #ffd700;
+      border-radius: 12px;
+      background: #ffd700;
+      color: #000;
+      font-size: 1.05rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button:hover, .button:focus-visible {
+      background: #fff;
+      border-color: #fff;
+      outline: none;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      margin: 24px auto 0;
+      border-radius: 12px;
+      background: #111;
+    }
+  </style>
 </head>
 <body>
-<div class="wrap">
-<h1>ORNEX</h1>
-<p>Official ORNEX App - Now Live</p>
-<a class="btn" href="https://vimeo.com">▶ WATCH ORNEX</a>
-<a class="btn btn2" href="https://github.com/FredrickORNEX2013/ORNEX">GitHub Repo</a>
-<p>Welcome to ORNEX. Your link is WORKING.</p>
-<video controls poster="https://picsum.photos/400/220">
-<source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
-</video>
-</div>
+  <main>
+    <h1>ORNEX</h1>
+    <p>Official ORNEX site — now live.</p>
+    <a class="button" href="#ornex-video">▶ WATCH ORNEX</a>
+    <p>Welcome to ORNEX. Your link is working.</p>
+    <video id="ornex-video" controls preload="metadata" playsinline aria-label="ORNEX video">
+      <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+      Sorry, your browser does not support embedded videos.
+    </video>
+  </main>
 </body>
 </html>

@@ -1,23 +1,29 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="apple-mobile-web-app-title" content="ORNEX" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" href="/ornex-logo.png" />
-    <link rel="apple-touch-icon" href="/ornex-logo.png" />
-    <title>ORNEX</title>
-    <style>html, body, #root { background-color: #000000; }</style>
-  </head>
-  <div id="splash" style="position:fixed;inset:0;background:#0A0A0A;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;"><div style="color:#7B2FFF;font-size:48px;font-weight:bold;letter-spacing:6px;">ORNEX</div><div style="color:white;opacity:0.6;">Love Forever</div></div><script>setTimeout(()=>{document.getElementById('splash').style.display='none'},2000)</script>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ORNEX</title>
+<style>
+body{margin:0;background:#000;color:#fff;font-family:Arial,sans-serif;text-align:center}
+.wrap{padding:40px 20px}
+h1{font-size:60px;letter-spacing:8px;margin:10px 0;color:#FFD700}
+p{color:#ccc}
+.btn{display:block;background:#FFD700;color:#000;padding:16px;margin:15px auto;max-width:320px;border-radius:12px;font-weight:bold;text-decoration:none;font-size:18px}
+.btn2{background:#222;color:#fff;border:1px solid #444}
+video{width:100%;max-width:400px;border-radius:12px;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>ORNEX</h1>
+<p>Official ORNEX App - Now Live</p>
+<a class="btn" href="https://vimeo.com">▶ WATCH ORNEX</a>
+<a class="btn btn2" href="https://github.com/FredrickORNEX2013/ORNEX">GitHub Repo</a>
+<p>Welcome to ORNEX. Your link is WORKING.</p>
+<video controls poster="https://picsum.photos/400/220">
+<source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+</video>
+</div>
+</body>
 </html>

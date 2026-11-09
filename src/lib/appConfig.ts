@@ -11,43 +11,40 @@ export type AppConfig = {
 
 const DEFAULT_CONFIG: AppConfig = {
   appName: 'ORNEX',
-  primaryColor: '#000000',
-  accentColor: '#ffffff',
+  primaryColor: '#A020F0',
+  accentColor: '#C084FC',
   logoIcon: 'play',
   showTabs: ['foryou', 'explore', 'post', 'inbox', 'me'],
 };
 
+const BRAND_COLORS = new Set(['#000000', '#111111', '#A020F0', '#8A2BE2', '#C084FC', '#FFFFFF']);
 let cachedConfig: AppConfig | null = null;
 
-export function getAppConfig(): AppConfig {
-  return cachedConfig || DEFAULT_CONFIG;
+function normalizeConfig(value: Record<string, unknown>): AppConfig {
+  const parsed = { ...DEFAULT_CONFIG, ...value } as AppConfig;
+  return {
+    ...parsed,
+    primaryColor: BRAND_COLORS.has(parsed.primaryColor?.toUpperCase()) ? parsed.primaryColor : DEFAULT_CONFIG.primaryColor,
+    accentColor: BRAND_COLORS.has(parsed.accentColor?.toUpperCase()) ? parsed.accentColor : DEFAULT_CONFIG.accentColor,
+    appName: 'ORNEX',
+  };
 }
+
+export function getAppConfig(): AppConfig { return cachedConfig || DEFAULT_CONFIG; }
 
 export function useAppConfig() {
   const [config, setConfig] = useState<AppConfig>(cachedConfig || DEFAULT_CONFIG);
-
   useEffect(() => {
-    if (cachedConfig) {
-      setConfig(cachedConfig);
-      return;
-    }
+    if (cachedConfig) { setConfig(cachedConfig); return; }
     (async () => {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('*')
-        .eq('key', 'app_config')
-        .maybeSingle();
+      const { data } = await supabase.from('app_settings').select('*').eq('key', 'app_config').maybeSingle();
       if (data?.value) {
-        const parsed = { ...DEFAULT_CONFIG, ...(data.value as Record<string, unknown>) } as AppConfig;
-        cachedConfig = parsed;
-        setConfig(parsed);
+        cachedConfig = normalizeConfig(data.value as Record<string, unknown>);
+        setConfig(cachedConfig);
       }
     })();
   }, []);
-
   return config;
 }
 
-export function clearAppConfigCache() {
-  cachedConfig = null;
-}
+export function clearAppConfigCache() { cachedConfig = null; }

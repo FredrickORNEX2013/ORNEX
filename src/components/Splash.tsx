@@ -29,7 +29,7 @@ export default function Splash({ onDone }: { onDone: () => void }) {
     <div
       aria-label="ORNEX splash screen"
       aria-hidden={leaving}
-      className={`fixed inset-0 z-[200] isolate overflow-hidden bg-black transition-opacity duration-[450ms] ${
+      className={`ornex-splash fixed inset-0 z-[200] isolate overflow-hidden bg-black transition-opacity duration-[450ms] ${
         leaving ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
     >
@@ -37,10 +37,15 @@ export default function Splash({ onDone }: { onDone: () => void }) {
         src="/IMG-20261109-WA9849.jpg"
         alt="ORNEX"
         fetchPriority="high"
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        className="ornex-splash-image absolute inset-0 h-full w-full object-cover object-center"
       />
-      <div className="absolute inset-x-0 bottom-[max(8vh,env(safe-area-inset-bottom))] flex justify-center" aria-label="Loading">
-        <span className="ornex-loading-pulse" />
+      <div className="ornex-splash-vignette absolute inset-0" />
+      <div className="ornex-splash-brand" aria-hidden="true">
+        <span className="ornex-splash-ring" />
+        <span className="ornex-splash-wordmark">ORNEX</span>
+      </div>
+      <div className="ornex-splash-loader" aria-label="Loading">
+        <span />
       </div>
     </div>
   );

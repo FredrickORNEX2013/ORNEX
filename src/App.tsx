@@ -45,7 +45,13 @@ export default function App() {
   const hash = useHashRoute();
   const config = useAppConfig();
   const [activeTab, setActiveTab] = useState<TabKey>('foryou');
-  const [splashDone, setSplashDone] = useState(false);
+  const [splashDone, setSplashDone] = useState(() => {
+    try {
+      return window.localStorage.getItem('ornex-splash-seen') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const finishSplash = useCallback(() => setSplashDone(true), []);
 
   useBoltKill();
@@ -74,9 +80,9 @@ export default function App() {
   const isForYou = activeTab === 'foryou';
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-[#0A0A0A] text-white">
+    <div className="flex h-[100dvh] flex-col bg-black text-white">
       {!isForYou && <Header appName={config.appName} />}
-      <main className="flex-1 overflow-hidden">{renderTab()}</main>
+      <main className="min-h-0 flex-1 overflow-hidden">{renderTab()}</main>
       <BottomNav active={activeTab} onChange={setActiveTab} visibleTabs={config.showTabs} />
       {!splashDone && <Splash onDone={finishSplash} />}
     </div>

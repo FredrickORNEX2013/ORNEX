@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const SPLASH_MS = 2500;
-const FADE_MS = 300;
+const FADE_MS = 450;
+const SPLASH_SEEN_KEY = 'ornex-splash-seen';
 
 export default function Splash({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
@@ -10,6 +11,11 @@ export default function Splash({ onDone }: { onDone: () => void }) {
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    try {
+      window.localStorage.setItem(SPLASH_SEEN_KEY, 'true');
+    } catch {
+      // Continue normally when browser storage is unavailable.
+    }
     setLeaving(true);
     window.setTimeout(onDone, FADE_MS);
   }, [onDone]);
@@ -22,17 +28,20 @@ export default function Splash({ onDone }: { onDone: () => void }) {
   return (
     <div
       aria-label="ORNEX splash screen"
-      className={`fixed inset-0 z-[200] flex items-center justify-center bg-black transition-opacity duration-300 ${
+      aria-hidden={leaving}
+      className={`fixed inset-0 z-[200] isolate overflow-hidden bg-black transition-opacity duration-[450ms] ${
         leaving ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
     >
       <img
-        src="/icon.svg"
+        src="/IMG-20261109-WA9849.jpg"
         alt="ORNEX"
-        width={512}
-        height={512}
-        className="h-[min(82vw,82vh)] w-[min(82vw,82vh)] object-contain"
+        fetchPriority="high"
+        className="absolute inset-0 h-full w-full object-cover object-center"
       />
+      <div className="absolute inset-x-0 bottom-[max(8vh,env(safe-area-inset-bottom))] flex justify-center" aria-label="Loading">
+        <span className="ornex-loading-pulse" />
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import './ornex-red-override.css'
 import { useCallback, useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import BottomNav, { type TabKey } from '@/components/BottomNav';

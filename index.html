@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="ORNEX - Watch. Create. Earn." />
     <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <link rel="manifest" href="/ORNEX/manifest.json" />
     <link rel="icon" type="image/jpeg" href="/ORNEX/icon.jpg" />
     <link rel="apple-touch-icon" href="/ORNEX/icon.jpg" />
@@ -15,5 +16,21 @@
       #splash h1 { color:#CC0000; font-size:48px; font-family:Arial, sans-serif; margin:0; letter-spacing:4px; }
       #splash p { color:#fff; font-family:Arial, sans-serif; margin:10px 0 20px 0; }
       #splash .bar { width:140px; height:4px; background:#333; overflow:hidden; border-radius:99px; }
-      #splash .bar div { height:100%; width
+      #splash .bar div { height:100%; width:40%; background:#CC0000; animation:load 1s infinite; }
+      @keyframes load { 0%{margin-left:-40%} 100%{margin-left:100%} }
+    </style>
+  </head>
+  <body>
+    <div id="splash">
+      <h1>ORNEX</h1>
+      <p>Watch. Create. Earn.</p>
+      <div class="bar"><div></div></div>
+    </div>
+    <div id="root"></div>
+    <script>
+      setTimeout(function(){ var s=document.getElementById('splash'); if(s) s.style.display='none'; }, 2500);
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
   

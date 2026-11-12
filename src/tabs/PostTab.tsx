@@ -15,8 +15,8 @@ import {
   AlertCircle,
   Zap,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { getOrCreateUserId } from '@/lib/user';
+import { supabase } from '@/lib/supabase';import 
+  import { getCurrentUserId } from '@/lib/user';
 import { invalidateVideoCache } from '@/lib/hooks';
 
 type Mode = 'choose' | 'camera' | 'edit' | 'details';
@@ -63,7 +63,8 @@ export default function PostTab() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const userId = getOrCreateUserId();
+  const [userId, setUserId] = useState<string | null>(null);
+useEffect(() => { getCurrentUserId().then(setUserId); }, []);
 
   const stopCamera = useCallback(() => {
     if (cameraStreamRef.current) {

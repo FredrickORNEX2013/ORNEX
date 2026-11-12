@@ -63,8 +63,6 @@ export default function App() {
 
   useBoltKill();
 
-  // Keep the content mounted and usable immediately; this deadline only dismisses
-  // the splash and never waits for auth, Supabase, config, or user data.
   useEffect(() => {
     const fallbackTimer = window.setTimeout(() => {
       setLoading(false);
@@ -96,7 +94,11 @@ export default function App() {
   return (
     <div aria-busy={loading} className="flex h-[100dvh] flex-col bg-black text-white">
       {!isForYou && <Header appName={config.appName} />}
-      <main className="min-h-0 flex-1 overflow-hidden bg-black">{renderTab()}</main>
+      <main className="min-h-0 flex-1 overflow-hidden bg-black">
+        <div key={activeTab} className="h-full w-full transition-none">
+          {renderTab()}
+        </div>
+      </main>
       <BottomNav active={activeTab} onChange={setActiveTab} visibleTabs={config.showTabs} />
       {showSplash && <Splash onDone={finishSplash} />}
     </div>

@@ -1,117 +1,53 @@
-import { type VideoRecord } from '@/lib/supabase';
+import { type VideoRecord, supabase } from '@/lib/supabase';
 
-export const VIMEO_TOKEN = '75c04bad79903d8d1e710128fbfb171f';
-
-const VIMEO_LIST_URL = 'https://api.vimeo.com/me/videos?per_page=50';
-const VIMEO_TIMEOUT_MS = 10000;
-
-type VimeoFile = {
-  link?: string;
-  type?: string;
-  width?: number;
-  height?: number;
-};
-
-type VimeoPictureSize = {
-  link?: string;
-  width?: number;
-  height?: number;
-};
+const VIMEO_FUNCTION = 'fetch-vimeo';
+const CATEGORIES = ['Comedy', 'Drama', 'Entertainment'] as const;
 
 type VimeoApiVideo = {
-  uri: string;
-  name?: string;
-  width?: number;
-  height?: number;
-  pictures?: { sizes?: VimeoPictureSize[] };
-  files?: VimeoFile[];
-};
-
-export type VimeoVideo = {
   id: string;
   title: string;
-  videoUrl: string;
-  thumb: string;
+  url: string;
+  thumbnail_url: string | null;
   orientation: 'landscape' | 'portrait';
   width: number;
   height: number;
+  created_at?: string;
 };
 
-const CATEGORIES = ['Comedy', 'Drama', 'Entertainment'] as const;
-
-function pickBestFile(files: VimeoFile[]): VimeoFile | undefined {
-  const playable = files.filter((f) => !!f.link);
-  const mp4 = playable.filter((f) => f.type === 'video/mp4');
-  const pool = mp4.length > 0 ? mp4 : playable;
-  return [...pool].sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0];
-}
-
-function toVimeoVideo(item: VimeoApiVideo): VimeoVideo | null {
-  const file = pickBestFile(item.files ?? []);
-  if (!file?.link) return null;
-
-  const sizes = item.pictures?.sizes ?? [];
-  const thumb = sizes[sizes.length - 1]?.link ?? '';
-  const width = item.width ?? file.width ?? 0;
-  const height = item.height ?? file.height ?? 0;
-
-  return {
-    id: item.uri.split('/').pop() ?? item.uri,
-    title: item.name ?? '',
-    videoUrl: file.link,
-    thumb,
-    orientation: height > width ? 'portrait' : 'landscape',
-    width,
-    height,
-  };
-}
+export type VimeoVideo = VimeoApiVideo;
 
 export async function fetchVimeoVideos(): Promise<VimeoVideo[]> {
-  try {
-    const res = await fetch(VIMEO_LIST_URL, {
-      headers: { Authorization: `Bearer ${VIMEO_TOKEN}` },
-      signal: AbortSignal.timeout(VIMEO_TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`Vimeo responded ${res.status}`);
-    const json = (await res.json()) as { data?: VimeoApiVideo[] };
-    return (json.data ?? [])
-      .map(toVimeoVideo)
-      .filter((v): v is VimeoVideo => v !== null);
-  } catch (err) {
-    console.error('Vimeo fetch failed', err);
+  const { data, error } = await supabase.functions.invoke<{ videos?: VimeoVideo[] }>(VIMEO_FUNCTION);
+  if (error) {
+    console.error('Vimeo fetch failed', error);
     return [];
   }
+  return Array.isArray(data?.videos) ? data.videos : [];
 }
 
-export function vimeoToVideoRecord(v: VimeoVideo, index: number): VideoRecord {
+export function vimeoToVideoRecord(video: VimeoVideo, index: number): VideoRecord {
+  const vimeoId = video.id.replace(/^vimeo_/, '');
   return {
-    id: v.id,
-    title: v.title,
-    url: v.videoUrl,
-    storage_path: `vimeo/${v.id}`,
-    caption: v.title,
+    id: `vimeo_${vimeoId}`,
+    title: video.title,
+    url: `https://player.vimeo.com/video/${encodeURIComponent(vimeoId)}?autoplay=1&muted=1&loop=1`,
+    storage_path: `vimeo/${vimeoId}`,
+    caption: video.title,
     category: CATEGORIES[index % CATEGORIES.length],
-    orientation: v.orientation,
+    orientation: video.orientation,
     user_id: null,
-    likes: Math.floor(Math.random() * 5000) + 100,
-    views: Math.floor(Math.random() * 50000) + 1000,
-    created_at: new Date(Date.now() - index * 86400000).toISOString(),
+    likes: 0,
+    views: 0,
+    created_at: video.created_at || new Date().toISOString(),
     status: 'approved',
-    nsfw_flagged: false,
-    nsfw_reason: null,
-    downloadable: false,
-    clicks: 0,
-    ad_impressions: 0,
-    is_ad: false,
-    ad_brand: null,
-    ad_link: null,
-    thumbnail_url: v.thumb || null,
+    thumbnail_url: video.thumbnail_url,
   };
 }
 
 export function mergeVideos(dbVideos: VideoRecord[], vimeoVideos: VimeoVideo[]): VideoRecord[] {
-  const vimeoRecords = vimeoVideos.map((v, i) => vimeoToVideoRecord(v, i));
-  const dbUrls = new Set(dbVideos.map((v) => v.url));
-  const uniqueVimeo = vimeoRecords.filter((v) => !dbUrls.has(v.url));
+  const vimeoRecords = vimeoVideos.map(vimeoToVideoRecord);
+  const dbIds = new Set(dbVideos.map((video) => video.id));
+  const dbUrls = new Set(dbVideos.map((video) => video.url));
+  const uniqueVimeo = vimeoRecords.filter((video) => !dbIds.has(video.id) && !dbUrls.has(video.url));
   return [...uniqueVimeo, ...dbVideos];
 }

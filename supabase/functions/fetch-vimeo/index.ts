@@ -1,73 +1,73 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-Vimeo-Token",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+type VimeoPicture = { width?: number; link?: string };
+type VimeoApiVideo = {
+  uri?: string;
+  name?: string;
+  description?: string;
+  width?: number;
+  height?: number;
+  created_time?: string;
+  pictures?: { sizes?: VimeoPicture[] };
+};
+
+function json(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
+
+  const accessToken = Deno.env.get("VIMEO_ACCESS_TOKEN");
+  if (!accessToken) return json({ error: "VIMEO_ACCESS_TOKEN secret not configured" }, 500);
 
   try {
-    // Try server-side secret first, then fall back to client-provided header
-    const vimeoToken = Deno.env.get("VIMEO_TOKEN") || req.headers.get("X-Vimeo-Token");
-    if (!vimeoToken) {
-      return new Response(
-        JSON.stringify({ error: "No Vimeo token provided" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const vimeoRes = await fetch(
-      "https://api.vimeo.com/me/videos?per_page=20&fields=uri,name,description,link,pictures,player_embed_url,width,height,created_time",
+    const vimeoResponse = await fetch(
+      "https://api.vimeo.com/me/videos?per_page=100&fields=uri,name,description,pictures,width,height,created_time",
       {
         headers: {
-          Authorization: `Bearer ${vimeoToken}`,
+          Authorization: `Bearer ${accessToken}`,
           Accept: "application/vnd.vimeo.*+json;version=3.4",
         },
-      }
+      },
     );
 
-    if (!vimeoRes.ok) {
-      const errText = await vimeoRes.text();
-      return new Response(
-        JSON.stringify({ error: `Vimeo API error: ${vimeoRes.status}`, details: errText }),
-        { status: vimeoRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!vimeoResponse.ok) {
+      return json({ error: `Vimeo API error: ${vimeoResponse.status}` }, vimeoResponse.status);
     }
 
-    const vimeoData = await vimeoRes.json();
-    const videos = (vimeoData.data || []).map((v: Record<string, unknown>) => {
-      const uri = v.uri as string;
-      const match = uri.match(/\/videos\/(\d+)/);
-      const vimeoId = match ? parseInt(match[1], 10) : 0;
-      const width = v.width as number;
-      const height = v.height as number;
-
-      const pictures = v.pictures as { sizes?: { width: number; height: number; link: string }[] } | undefined;
-      const sizes = pictures?.sizes || [];
-      const thumb = sizes.find((s) => s.width >= 640 && s.width <= 1280) || sizes[sizes.length - 1];
-
-      return {
-        id: `vimeo_${vimeoId}`,
-        title: (v.name as string) || `Vimeo Video ${vimeoId}`,
-        thumbnail_url: thumb?.link || "",
-        embed_url: (v.player_embed_url as string) || `https://player.vimeo.com/video/${vimeoId}`,
+    const result = await vimeoResponse.json();
+    const videos = ((result.data || []) as VimeoApiVideo[]).flatMap((video) => {
+      const match = video.uri?.match(/\/videos\/(\d+)/);
+      if (!match) return [];
+      const width = video.width || 0;
+      const height = video.height || 0;
+      const pictures = video.pictures?.sizes || [];
+      const thumbnail = [...pictures].sort((a, b) => (b.width || 0) - (a.width || 0))[0]?.link || null;
+      const id = match[1];
+      return [{
+        id,
+        title: video.name || `Vimeo Video ${id}`,
+        url: `https://player.vimeo.com/video/${id}?autoplay=1&muted=1&loop=1`,
+        thumbnail_url: thumbnail,
         orientation: height > width ? "portrait" : "landscape",
         width,
         height,
-      };
+        created_at: video.created_time,
+      }];
     });
 
-    return new Response(
-      JSON.stringify({ videos }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ videos });
+  } catch (error) {
+    console.error("Vimeo request failed", error);
+    return json({ error: "Unable to fetch Vimeo videos" }, 502);
   }
 });

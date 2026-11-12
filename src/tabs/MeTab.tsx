@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 import { useVideos, useProfile, useWatchTime } from '@/lib/hooks';
 import { supabase, type ProfileRecord } from '@/lib/supabase';
-import { formatViews } 
-  import { getCurrentUserId } from '@/lib/user';
+import { formatViews } from '@/lib/utils';
+import { getCurrentUserId } from '@/lib/user';
 import {
   getUnclaimedOfflineVideos, getOfflineVideosUnlocked,
   getWatchProgress, getSecondsIntoCurrentHour,

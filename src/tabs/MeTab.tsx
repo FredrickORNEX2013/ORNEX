@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, Heart, Settings, Pencil, Share2, Grid3X3, Plus, X, Check } from 'lucide-react';
+import { Check, Pencil, Plus, Settings, Share2, X } from 'lucide-react';
 import { useVideos, useProfile } from '@/lib/hooks';
 import { supabase, type ProfileRecord, type VideoRecord } from '@/lib/supabase';
 import { formatViews } from '@/lib/utils';
@@ -15,7 +15,14 @@ export default function MeTab() {
   const [likedVideos, setLikedVideos] = useState<VideoRecord[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
   const [followerCount, setFollowerCount] = useState(0);
+  const [likesCount, setLikesCount] = useState(0);
   const [showEditProfile, setShowEditProfile] = useState(false);
+
+  const myVideos = useMemo(() => videos.filter((video) => video.user_id === userId), [videos, userId]);
+  const displayedVideos = activeTab === 'videos' ? myVideos : likedVideos;
+  const username = profile?.username || 'ornex_user';
+  const displayName = profile?.display_name || 'ORNEX User';
+  const bio = (profile as (ProfileRecord & { bio?: string }) | null)?.bio || '';
 
   useEffect(() => { void getCurrentUserId().then(setUserId); }, []);
 
@@ -33,14 +40,16 @@ export default function MeTab() {
       setFollowerCount(followers || 0);
       const likedIds = new Set((likes || []).map((like) => like.video_id as string));
       setLikedVideos(videos.filter((video) => likedIds.has(video.id)));
+
+      if (myVideos.length === 0) {
+        setLikesCount(0);
+      } else {
+        const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).in('video_id', myVideos.map((video) => video.id));
+        if (!cancelled) setLikesCount(count || 0);
+      }
     })();
     return () => { cancelled = true; };
-  }, [userId, videos]);
-
-  const myVideos = useMemo(() => videos.filter((video) => video.user_id === userId), [videos, userId]);
-  const displayedVideos = activeTab === 'videos' ? myVideos : likedVideos;
-  const username = profile?.username || 'ornex_user';
-  const bio = (profile as (ProfileRecord & { bio?: string }) | null)?.bio || 'Creator · sharing my world on ORNEX';
+  }, [userId, videos, myVideos]);
 
   const shareProfile = async () => {
     const url = window.location.href;
@@ -51,52 +60,50 @@ export default function MeTab() {
   };
 
   return (
-    <div className="ornex-me min-h-[calc(100dvh-3.5rem-70px)] overflow-y-auto bg-[#000000] text-[#FFFFFF]">
-      <header className="sticky top-0 z-10 flex h-12 items-center justify-between bg-[#000000] px-4">
-        <span className="text-base font-bold text-[#FFFFFF]">@{username}</span>
-        <button type="button" aria-label="Settings" onClick={() => setShowEditProfile(true)} className="flex h-10 w-10 items-center justify-center rounded-full text-[#FFFFFF] hover:bg-[#111111]">
-          <Settings className="h-[22px] w-[22px]" />
+    <div className="ornex-me min-h-[calc(100dvh-3.5rem-70px)] overflow-y-auto bg-[#000000] pb-[120px] text-[#FFFFFF]">
+      <header className="sticky top-0 z-10 grid h-12 grid-cols-[40px_1fr_40px] items-center bg-[#000000] px-4">
+        <span aria-hidden="true" />
+        <h1 className="text-center text-base font-bold text-[#FFFFFF]">@{username}</h1>
+        <button type="button" aria-label="Edit profile settings" onClick={() => setShowEditProfile(true)} className="flex h-10 w-10 items-center justify-center rounded-full text-[#FFFFFF]">
+          <Settings className="h-[21px] w-[21px]" />
         </button>
       </header>
 
-      <section className="px-5 pb-5 pt-4">
-        <div className="flex items-center gap-5">
-          <div className="flex h-[92px] w-[92px] shrink-0 items-center justify-center rounded-full border-[3px] border-[#D61E2B] bg-[#000000] text-[30px] font-extrabold tracking-tight text-[#FFFFFF]" aria-label="ORNEX avatar">OU</div>
-          <div className="grid flex-1 grid-cols-3 text-center">
-            <Stat value={myVideos.length} label="Posts" />
-            <Stat value={followingCount} label="Following" />
-            <Stat value={followerCount} label="Followers" />
-          </div>
+      <section className="px-5 pb-5 pt-5 text-center">
+        <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full border-[3px] border-[#D61E2B] bg-[#000000] text-3xl font-bold tracking-tight text-[#FFFFFF]" aria-label="ORNEX avatar">
+          {displayName.trim().slice(0, 2).toUpperCase() || 'OU'}
+        </div>
+        <h2 className="mt-3 text-base font-bold text-[#FFFFFF]">{displayName}</h2>
+        {bio && <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-[#FFFFFF]/60">{bio}</p>}
+
+        <div className="mx-auto mt-5 grid max-w-sm grid-cols-3 text-center">
+          <Stat value={followingCount} label="Following" />
+          <Stat value={followerCount} label="Followers" />
+          <Stat value={likesCount} label="Likes" />
         </div>
 
-        <div className="mt-4">
-          <h1 className="text-base font-bold text-[#FFFFFF]">{profile?.display_name || 'ORNEX User'}</h1>
-          <p className="mt-0.5 text-sm text-[#999999]">@{username}</p>
-          <p className="mt-2 text-sm leading-5 text-[#999999]">{bio}</p>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <button type="button" onClick={() => setShowEditProfile(true)} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#FFFFFF] text-sm font-bold text-[#000000] transition-opacity hover:opacity-90">
-            <Pencil className="h-4 w-4" /> Edit profile
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" onClick={() => setShowEditProfile(true)} className="flex h-10 items-center justify-center gap-2 rounded-md bg-[#FFFFFF] text-sm font-bold text-[#000000]">
+            <Pencil className="h-4 w-4" /> Edit Profile
           </button>
-          <button type="button" onClick={() => void shareProfile()} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[#FFFFFF] bg-[#000000] text-sm font-bold text-[#FFFFFF] transition-colors hover:bg-[#111111]">
-            <Share2 className="h-4 w-4" /> Share profile
+          <button type="button" onClick={() => void shareProfile()} className="flex h-10 items-center justify-center gap-2 rounded-md border border-[#FFFFFF] bg-[#000000] text-sm font-bold text-[#FFFFFF]">
+            <Share2 className="h-4 w-4" /> Share Profile
           </button>
         </div>
       </section>
 
-      <div className="grid grid-cols-2 border-b border-[#222222]">
+      <div className="grid grid-cols-2 border-b border-[#FFFFFF]/20">
         <ProfileTabButton active={activeTab === 'videos'} label="Videos" onClick={() => setActiveTab('videos')} />
         <ProfileTabButton active={activeTab === 'liked'} label="Liked" onClick={() => setActiveTab('liked')} />
       </div>
 
       {displayedVideos.length === 0 ? (
         <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-[#D61E2B]/40 bg-[#000000]">
-            <Plus className="h-9 w-9 text-[#D61E2B]" strokeWidth={2.5} />
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#D61E2B] bg-[#000000]">
+            <Plus className="h-8 w-8 text-[#D61E2B]" strokeWidth={2} />
           </div>
           <p className="text-base font-bold text-[#FFFFFF]">{activeTab === 'videos' ? 'No videos yet' : 'No liked videos yet'}</p>
-          {activeTab === 'videos' && <p className="mt-1 text-sm text-[#999999]">Your videos will appear here.</p>}
+          {activeTab === 'videos' && <p className="mt-1 text-sm text-[#FFFFFF]/60">Your videos will appear here.</p>}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-px bg-[#000000]">
@@ -112,15 +119,15 @@ export default function MeTab() {
 
 function Stat({ value, label }: { value: number; label: string }) {
   return <div className="flex flex-col items-center">
-    <span className="text-base font-extrabold text-[#FFFFFF]">{formatViews(value)}</span>
-    <span className="mt-0.5 text-xs text-[#999999]">{label}</span>
+    <span className="text-base font-bold text-[#FFFFFF]">{formatViews(value)}</span>
+    <span className="mt-0.5 text-xs text-[#FFFFFF]/60">{label}</span>
   </div>;
 }
 
 function ProfileTabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`relative flex h-12 items-center justify-center text-sm font-semibold transition-colors ${active ? 'text-[#FFFFFF]' : 'text-[#999999]'}`}>
+  return <button type="button" onClick={onClick} className={`relative flex h-12 items-center justify-center text-sm font-semibold ${active ? 'text-[#FFFFFF]' : 'text-[#FFFFFF]/60'}`}>
     {label}
-    {active && <span className="absolute bottom-0 h-[3px] w-12 rounded-full bg-[#D61E2B]" />}
+    {active && <span className="absolute bottom-0 h-[3px] w-12 bg-[#D61E2B]" />}
   </button>;
 }
 
@@ -166,16 +173,16 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: ProfileRecor
   };
 
   return <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#000000]/80 p-4" onClick={onClose}>
-    <div className="w-full max-w-sm rounded-2xl border border-[#333333] bg-[#000000] p-5" onClick={(event) => event.stopPropagation()}>
+    <div className="w-full max-w-sm border border-[#FFFFFF]/25 bg-[#000000] p-5" onClick={(event) => event.stopPropagation()}>
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-lg font-bold text-[#FFFFFF]">Edit profile</h2>
-        <button type="button" aria-label="Close" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-[#FFFFFF] hover:bg-[#111111]"><X className="h-5 w-5" /></button>
+        <button type="button" aria-label="Close" onClick={onClose} className="flex h-9 w-9 items-center justify-center text-[#FFFFFF]"><X className="h-5 w-5" /></button>
       </div>
-      <label className="mb-1 block text-xs font-medium text-[#999999]">Username</label>
-      <input value={username} onChange={(event) => setUsername(event.target.value)} maxLength={30} className="mb-4 w-full rounded-lg border border-[#333333] bg-[#000000] px-3 py-2.5 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]" />
-      <label className="mb-1 block text-xs font-medium text-[#999999]">Display name</label>
-      <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} className="mb-5 w-full rounded-lg border border-[#333333] bg-[#000000] px-3 py-2.5 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]" />
-      <button type="button" onClick={() => void handleSave()} disabled={saving || !username.trim() || !userId} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FFFFFF] py-3 text-sm font-bold text-[#000000] disabled:opacity-50">
+      <label className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Username</label>
+      <input value={username} onChange={(event) => setUsername(event.target.value)} maxLength={30} className="mb-4 w-full border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2.5 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]" />
+      <label className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Display name</label>
+      <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} className="mb-5 w-full border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2.5 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]" />
+      <button type="button" onClick={() => void handleSave()} disabled={saving || !username.trim() || !userId} className="flex w-full items-center justify-center gap-2 bg-[#FFFFFF] py-2.5 text-sm font-bold text-[#000000] disabled:opacity-60">
         {saved ? <><Check className="h-4 w-4" /> Saved</> : saving ? 'Saving…' : 'Save changes'}
       </button>
     </div>

@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 import { useVideos, useProfile, useWatchTime } from '@/lib/hooks';
 import { supabase, type ProfileRecord } from '@/lib/supabase';
-import { formatViews } from '@/lib/format';
-import { getOrCreateUserId } from '@/lib/user';
+import { formatViews } 
+  import { getCurrentUserId } from '@/lib/user';
 import {
   getUnclaimedOfflineVideos, getOfflineVideosUnlocked,
   getWatchProgress, getSecondsIntoCurrentHour,
@@ -22,7 +22,8 @@ export default function MeTab() {
   const [claimedVideos, setClaimedVideos] = useState<number[]>([]);
   const [showRules, setShowRules] = useState(false);
   const [showEditUsername, setShowEditUsername] = useState(false);
-  const userId = getOrCreateUserId();
+  const [userId, setUserId] = useState<string | null>(null);
+useEffect(() => { getCurrentUserId().then(setUserId); }, []);
 
   const myVideos = videos.filter((v) => v.user_id === userId);
   const totalLikes = myVideos.reduce((sum, v) => sum + v.likes, 0);
@@ -212,7 +213,8 @@ function EditUsernameModal({ profile, onClose, onSaved }: { profile: ProfileReco
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const userId = getOrCreateUserId();
+  const [userId, setUserId] = useState<string | null>(null);
+useEffect(() => { getCurrentUserId().then(setUserId); }, []);
 
   const handleSave = async () => {
     if (!username.trim()) return;

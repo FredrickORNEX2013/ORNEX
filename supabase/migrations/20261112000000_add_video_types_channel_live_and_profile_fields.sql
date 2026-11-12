@@ -1,0 +1,10 @@
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS duration_seconds integer NOT NULL DEFAULT 0;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS type text;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_live boolean NOT NULL DEFAULT false;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_channel boolean NOT NULL DEFAULT false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bio text NOT NULL DEFAULT '';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_channel boolean NOT NULL DEFAULT false;
+UPDATE videos SET type = CASE WHEN duration_seconds <= 60 THEN 'SHORT' ELSE 'LONG' END WHERE type IS NULL;
+CREATE INDEX IF NOT EXISTS videos_type_likes_idx ON videos (type, likes DESC);
+CREATE INDEX IF NOT EXISTS videos_live_channel_idx ON videos (is_live, is_channel) WHERE is_live = true;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique ON profiles (lower(username));

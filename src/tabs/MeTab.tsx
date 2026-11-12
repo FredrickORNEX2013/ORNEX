@@ -1,190 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Pencil, Plus, Settings, Share2, X } from 'lucide-react';
+import { Check, Pencil, Plus, Settings, Share2, X, Camera } from 'lucide-react';
 import { useVideos, useProfile } from '@/lib/hooks';
 import { supabase, type ProfileRecord, type VideoRecord } from '@/lib/supabase';
 import { formatViews } from '@/lib/utils';
 import { getCurrentUserId } from '@/lib/user';
-
-type ProfileTab = 'videos' | 'liked';
-
-export default function MeTab() {
-  const { videos } = useVideos();
-  const { profile, loading: profileLoading } = useProfile();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ProfileTab>('videos');
-  const [likedVideos, setLikedVideos] = useState<VideoRecord[]>([]);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [likesCount, setLikesCount] = useState(0);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-
-  const myVideos = useMemo(() => videos.filter((video) => video.user_id === userId), [videos, userId]);
-  const displayedVideos = activeTab === 'videos' ? myVideos : likedVideos;
-  const username = profile?.username || 'ornex_user';
-  const displayName = profile?.display_name || 'ORNEX User';
-  const bio = (profile as (ProfileRecord & { bio?: string }) | null)?.bio || '';
-
-  useEffect(() => { void getCurrentUserId().then(setUserId); }, []);
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    void (async () => {
-      const [{ count: following }, { count: followers }, { data: likes }] = await Promise.all([
-        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId),
-        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', userId),
-        supabase.from('likes').select('video_id').eq('user_id', userId),
-      ]);
-      if (cancelled) return;
-      setFollowingCount(following || 0);
-      setFollowerCount(followers || 0);
-      const likedIds = new Set((likes || []).map((like) => like.video_id as string));
-      setLikedVideos(videos.filter((video) => likedIds.has(video.id)));
-
-      if (myVideos.length === 0) {
-        setLikesCount(0);
-      } else {
-        const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).in('video_id', myVideos.map((video) => video.id));
-        if (!cancelled) setLikesCount(count || 0);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [userId, videos, myVideos]);
-
-  const shareProfile = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) await navigator.share({ title: `@${username} on ORNEX`, url });
-      else if (navigator.clipboard) await navigator.clipboard.writeText(url);
-    } catch { /* Sharing can be dismissed by the user. */ }
-  };
-
-  return (
-    <div className="ornex-me min-h-[calc(100dvh-3.5rem-70px)] overflow-y-auto bg-[#000000] pb-[120px] text-[#FFFFFF]">
-      <header className="sticky top-0 z-10 grid h-12 grid-cols-[40px_1fr_40px] items-center bg-[#000000] px-4">
-        <span aria-hidden="true" />
-        <h1 className="text-center text-base font-bold text-[#FFFFFF]">@{username}</h1>
-        <button type="button" aria-label="Edit profile settings" onClick={() => setShowEditProfile(true)} className="flex h-10 w-10 items-center justify-center rounded-full text-[#FFFFFF]">
-          <Settings className="h-[21px] w-[21px]" />
-        </button>
-      </header>
-
-      <section className="px-5 pb-5 pt-5 text-center">
-        <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full border-[3px] border-[#D61E2B] bg-[#000000] text-3xl font-bold tracking-tight text-[#FFFFFF]" aria-label="ORNEX avatar">
-          {displayName.trim().slice(0, 2).toUpperCase() || 'OU'}
-        </div>
-        <h2 className="mt-3 text-base font-bold text-[#FFFFFF]">{displayName}</h2>
-        {bio && <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-[#FFFFFF]/60">{bio}</p>}
-
-        <div className="mx-auto mt-5 grid max-w-sm grid-cols-3 text-center">
-          <Stat value={followingCount} label="Following" />
-          <Stat value={followerCount} label="Followers" />
-          <Stat value={likesCount} label="Likes" />
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <button type="button" onClick={() => setShowEditProfile(true)} className="flex h-10 items-center justify-center gap-2 rounded-md bg-[#FFFFFF] text-sm font-bold text-[#000000]">
-            <Pencil className="h-4 w-4" /> Edit Profile
-          </button>
-          <button type="button" onClick={() => void shareProfile()} className="flex h-10 items-center justify-center gap-2 rounded-md border border-[#FFFFFF] bg-[#000000] text-sm font-bold text-[#FFFFFF]">
-            <Share2 className="h-4 w-4" /> Share Profile
-          </button>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-2 border-b border-[#FFFFFF]/20">
-        <ProfileTabButton active={activeTab === 'videos'} label="Videos" onClick={() => setActiveTab('videos')} />
-        <ProfileTabButton active={activeTab === 'liked'} label="Liked" onClick={() => setActiveTab('liked')} />
-      </div>
-
-      {displayedVideos.length === 0 ? (
-        <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#D61E2B] bg-[#000000]">
-            <Plus className="h-8 w-8 text-[#D61E2B]" strokeWidth={2} />
-          </div>
-          <p className="text-base font-bold text-[#FFFFFF]">{activeTab === 'videos' ? 'No videos yet' : 'No liked videos yet'}</p>
-          {activeTab === 'videos' && <p className="mt-1 text-sm text-[#FFFFFF]/60">Your videos will appear here.</p>}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-px bg-[#000000]">
-          {displayedVideos.map((video) => <VideoTile key={video.id} video={video} />)}
-        </div>
-      )}
-
-      {profileLoading && <div className="sr-only" aria-live="polite">Loading profile</div>}
-      {showEditProfile && <EditProfileModal profile={profile} onClose={() => setShowEditProfile(false)} onSaved={() => window.location.reload()} />}
-    </div>
-  );
+type ProfileTab='videos'|'liked';
+export default function MeTab(){const {videos}=useVideos();const {profile,loading:profileLoading}=useProfile();const [userId,setUserId]=useState<string|null>(null);const [activeTab,setActiveTab]=useState<ProfileTab>('videos');const [likedVideos,setLikedVideos]=useState<VideoRecord[]>([]);const [followingCount,setFollowingCount]=useState(0);const [followerCount,setFollowerCount]=useState(0);const [likesCount,setLikesCount]=useState(0);const [showEdit,setShowEdit]=useState(false);const [avatarMenu,setAvatarMenu]=useState(false);
+ const myVideos=useMemo(()=>videos.filter(v=>v.user_id===userId),[videos,userId]);const displayed=activeTab==='videos'?myVideos:likedVideos;const username=profile?.username||'ornex_user';const displayName=profile?.display_name||'ORNEX User';const bio=(profile as (ProfileRecord&{bio?:string})|null)?.bio||'';
+ useEffect(()=>{void getCurrentUserId().then(setUserId);},[]);useEffect(()=>{if(!userId)return;let cancelled=false;void(async()=>{const [{count:f},{count:followers},{data:likes}]=await Promise.all([supabase.from('follows').select('*',{count:'exact',head:true}).eq('follower_id',userId),supabase.from('follows').select('*',{count:'exact',head:true}).eq('following_id',userId),supabase.from('likes').select('video_id').eq('user_id',userId)]);if(cancelled)return;setFollowingCount(f||0);setFollowerCount(followers||0);const ids=new Set((likes||[]).map(x=>x.video_id as string));setLikedVideos(videos.filter(v=>ids.has(v.id)));if(!myVideos.length)setLikesCount(0);else{const {count}=await supabase.from('likes').select('*',{count:'exact',head:true}).in('video_id',myVideos.map(v=>v.id));if(!cancelled)setLikesCount(count||0);}})();return()=>{cancelled=true;};},[userId,videos,myVideos]);
+ const uploadAvatar=async(file?:File)=>{if(!file||!userId)return;const path=`${userId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error}=await supabase.storage.from('avatars').upload(path,file,{upsert:true,contentType:file.type});if(error)return;const url=supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;await supabase.from('profiles').update({avatar_url:url}).eq('id',userId);window.location.reload();};const removeAvatar=async()=>{if(userId)await supabase.from('profiles').update({avatar_url:null}).eq('id',userId);window.location.reload();};
+ const share=async()=>{try{if(navigator.share)await navigator.share({title:`@${username} on ORNEX`,url:window.location.href});else await navigator.clipboard?.writeText(window.location.href);}catch{}}
+ return <div className="ornex-me min-h-[calc(100dvh-3.5rem-70px)] overflow-y-auto bg-[#000000] pb-[120px] text-[#FFFFFF]"><header className="sticky top-0 z-10 grid h-12 grid-cols-[40px_1fr_40px] items-center bg-[#000000] px-4"><span/><h1 className="text-center text-base font-bold">@{username}</h1><button aria-label="Edit profile settings" onClick={()=>setShowEdit(true)} className="flex h-10 w-10 items-center justify-center"><Settings className="h-[21px] w-[21px]"/></button></header>
+ <section className="px-5 pb-5 pt-5 text-center"><button onClick={()=>setAvatarMenu(true)} aria-label="Change profile photo" className="relative mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-[3px] border-[#D61E2B] bg-black text-3xl font-bold">{profile?.avatar_url?<img src={profile.avatar_url} alt="Profile" className="h-full w-full rounded-full object-cover"/>:displayName.trim().slice(0,2).toUpperCase()||'OU'}<Camera className="absolute bottom-1 right-1 h-6 w-6 rounded-full bg-[#D61E2B] p-1"/></button><h2 className="mt-3 text-base font-bold">{displayName}</h2>{bio&&<p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-white/60">{bio}</p>}<div className="mx-auto mt-5 grid max-w-sm grid-cols-3 text-center"><Stat value={followingCount} label="Following"/><Stat value={followerCount} label="Followers"/><Stat value={likesCount} label="Likes"/></div><div className="mt-5 grid grid-cols-2 gap-3"><button onClick={()=>setShowEdit(true)} className="flex h-10 items-center justify-center gap-2 rounded-md bg-white text-sm font-bold text-black"><Pencil className="h-4 w-4"/>Edit Profile</button><button onClick={()=>void share()} className="flex h-10 items-center justify-center gap-2 rounded-md border border-white bg-black text-sm font-bold"><Share2 className="h-4 w-4"/>Share Profile</button></div></section>
+ <div className="grid grid-cols-2 border-b border-white/20"><Tab active={activeTab==='videos'} label="Videos" onClick={()=>setActiveTab('videos')}/><Tab active={activeTab==='liked'} label="Liked" onClick={()=>setActiveTab('liked')}/></div>{displayed.length===0?<div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center"><div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#D61E2B]"><Plus className="h-8 w-8 text-[#D61E2B]"/></div><p className="font-bold">No {activeTab==='videos'?'videos':'liked videos'} yet</p></div>:<div className="grid grid-cols-3 gap-px bg-black">{displayed.map(v=><div key={v.id} className="relative aspect-[9/16] overflow-hidden bg-black">{v.thumbnail_url?<img src={v.thumbnail_url} alt={v.title||'Video'} className="h-full w-full object-cover"/>:<video src={`${v.url}#t=1`} preload="metadata" muted playsInline className="h-full w-full object-cover"/>}<span className="absolute bottom-2 left-2 text-xs">{formatViews(v.views)} views</span></div>)}</div>}
+ {profileLoading&&<span className="sr-only">Loading profile</span>}{avatarMenu&&<AvatarMenu onClose={()=>setAvatarMenu(false)} onPick={uploadAvatar} onRemove={()=>void removeAvatar()}/ >}{showEdit&&<EditProfile profile={profile} onClose={()=>setShowEdit(false)} onSaved={()=>window.location.reload()}/>}
+ </div>;
 }
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return <div className="flex flex-col items-center">
-    <span className="text-base font-bold text-[#FFFFFF]">{formatViews(value)}</span>
-    <span className="mt-0.5 text-xs text-[#FFFFFF]/60">{label}</span>
-  </div>;
-}
-
-function ProfileTabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`relative flex h-12 items-center justify-center text-sm font-semibold ${active ? 'text-[#FFFFFF]' : 'text-[#FFFFFF]/60'}`}>
-    {label}
-    {active && <span className="absolute bottom-0 h-[3px] w-12 bg-[#D61E2B]" />}
-  </button>;
-}
-
-function VideoTile({ video }: { video: VideoRecord }) {
-  return <div className="relative aspect-[9/16] overflow-hidden bg-[#000000]">
-    {video.thumbnail_url ? (
-      <img src={video.thumbnail_url} alt={video.caption || video.title || 'Video thumbnail'} loading="lazy" className="h-full w-full object-cover" />
-    ) : (
-      <video src={`${video.url}#t=1`} preload="metadata" muted playsInline className="h-full w-full object-cover" />
-    )}
-    <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-[#000000]/70 px-1.5 py-1 text-xs font-semibold text-[#FFFFFF]">
-      <PlayCountIcon />{formatViews(video.views)}
-    </div>
-  </div>;
-}
-
-function PlayCountIcon() {
-  return <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-[#D61E2B]"><path d="M4 2.8c0-.7.8-1.1 1.4-.7l8 5.2a.9.9 0 0 1 0 1.5l-8 5.2c-.6.4-1.4 0-1.4-.7V2.8Z" /></svg>;
-}
-
-function EditProfileModal({ profile, onClose, onSaved }: { profile: ProfileRecord | null; onClose: () => void; onSaved: () => void }) {
-  const [username, setUsername] = useState(profile?.username || '');
-  const [displayName, setDisplayName] = useState(profile?.display_name || '');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => { void getCurrentUserId().then(setUserId); }, []);
-
-  const handleSave = async () => {
-    if (!username.trim() || !userId) return;
-    setSaving(true);
-    const { data: existing } = await supabase.from('profiles').select('id').eq('username', username.trim()).neq('id', userId).maybeSingle();
-    if (existing) { setSaving(false); return; }
-    await supabase.from('profiles').upsert({
-      id: userId,
-      username: username.trim(),
-      display_name: displayName.trim() || username.trim(),
-      avatar_color: '#000000',
-    });
-    setSaving(false);
-    setSaved(true);
-    window.setTimeout(onSaved, 700);
-  };
-
-  return <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#000000]/80 p-4" onClick={onClose}>
-    <div className="w-full max-w-sm border border-[#FFFFFF]/25 bg-[#000000] p-5" onClick={(event) => event.stopPropagation()}>
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[#FFFFFF]">Edit profile</h2>
-        <button type="button" aria-label="Close" onClick={onClose} className="flex h-9 w-9 items-center justify-center text-[#FFFFFF]"><X className="h-5 w-5" /></button>
-      </div>
-      <label className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Username</label>
-      <input value={username} onChange={(event) => setUsername(event.target.value)} maxLength={30} className="mb-4 w-full border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2.5 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]" />
-      <label className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Display name</label>
-      <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} className="mb-5 w-full border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2.5 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]" />
-      <button type="button" onClick={() => void handleSave()} disabled={saving || !username.trim() || !userId} className="flex w-full items-center justify-center gap-2 bg-[#FFFFFF] py-2.5 text-sm font-bold text-[#000000] disabled:opacity-60">
-        {saved ? <><Check className="h-4 w-4" /> Saved</> : saving ? 'Saving…' : 'Save changes'}
-      </button>
-    </div>
-  </div>;
-}
+function Stat({value,label}:{value:number;label:string}){return <div><span className="block font-bold">{formatViews(value)}</span><span className="text-xs text-white/60">{label}</span></div>}
+function Tab({active,label,onClick}:{active:boolean;label:string;onClick:()=>void}){return <button onClick={onClick} className={`relative h-12 text-sm font-semibold ${active?'text-white':'text-white/60'}`}>{label}{active&&<span className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 bg-[#D61E2B]"/>}</button>}
+function AvatarMenu({onClose,onPick,onRemove}:{onClose:()=>void;onPick:(f?:File)=>void;onRemove:()=>void}){return <div className="fixed inset-0 z-[99999] flex items-end bg-black/70" onClick={onClose}><div className="w-full space-y-3 rounded-t-2xl bg-black p-5" onClick={e=>e.stopPropagation()}><h3 className="mb-4 text-center font-bold">Profile photo</h3><label className="block w-full bg-[#D61E2B] py-3 text-center font-semibold">Take Photo<input type="file" accept="image/*" capture="user" className="hidden" onChange={e=>onPick(e.target.files?.[0])}/></label><label className="block w-full border border-white/30 py-3 text-center">Choose from Gallery<input type="file" accept="image/*" className="hidden" onChange={e=>onPick(e.target.files?.[0])}/></label><button onClick={onRemove} className="w-full border border-white/30 py-3">Remove Photo</button><button onClick={onClose} className="w-full py-2 text-white/60">Cancel</button></div></div>}
+function EditProfile({profile,onClose,onSaved}:{profile:ProfileRecord|null;onClose:()=>void;onSaved:()=>void}){const [username,setUsername]=useState(profile?.username||'');const [name,setName]=useState(profile?.display_name||'');const [bio,setBio]=useState((profile as (ProfileRecord&{bio?:string})|null)?.bio||'');const [userId,setUserId]=useState<string|null>(null);const [available,setAvailable]=useState<boolean|null>(null);const [saving,setSaving]=useState(false);const [error,setError]=useState('');useEffect(()=>{void getCurrentUserId().then(setUserId);},[]);const clean=username.toLowerCase().replace(/[^a-z0-9_]/g,'');useEffect(()=>{if(!clean||!userId){setAvailable(null);return;}let live=true;const timer=window.setTimeout(async()=>{const {data}=await supabase.from('profiles').select('id').ilike('username',clean).neq('id',userId).maybeSingle();if(live)setAvailable(!data);},250);return()=>{live=false;clearTimeout(timer);};},[clean,userId]);const save=async()=>{if(!userId||!clean||available===false)return;setSaving(true);setError('');const {error}=await supabase.from('profiles').upsert({id:userId,username:clean,display_name:name.trim()||clean,bio:bio.slice(0,80)});setSaving(false);if(error){setError(error.message);return;}onSaved();};return <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 p-4" onClick={onClose}><div className="w-full max-w-sm border border-white/25 bg-black p-5" onClick={e=>e.stopPropagation()}><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold">Edit profile</h2><button onClick={onClose}><X/></button></div><label className="mb-1 block text-xs text-white/60">Name</label><input value={name} onChange={e=>setName(e.target.value)} maxLength={50} className="mb-3 w-full border border-white/25 bg-black p-3 text-sm"/><label className="mb-1 block text-xs text-white/60">Username</label><div className="mb-1 flex border border-white/25"><span className="p-3 text-white/60">@</span><input value={username} onChange={e=>setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,''))} maxLength={30} className="min-w-0 flex-1 bg-black p-3 text-sm outline-none"/></div><p className={`mb-3 text-xs ${available===true?'text-green-500':available===false?'text-[#D61E2B]':'text-white/50'}`}>{available===true?'Available':available===false?'Taken':'Lowercase letters, numbers, and _ only'}</p><label className="mb-1 block text-xs text-white/60">Bio</label><textarea value={bio} onChange={e=>setBio(e.target.value.slice(0,80))} maxLength={80} className="w-full border border-white/25 bg-black p-3 text-sm"/><p className="mb-4 text-right text-xs text-white/60">{bio.length}/80</p>{error&&<p className="mb-3 text-xs text-[#D61E2B]">{error}</p>}<button disabled={saving||available===false||!clean} onClick={()=>void save()} className="flex w-full items-center justify-center gap-2 bg-[#D61E2B] py-3 font-bold">{saving?'Saving…':<><Check className="h-4 w-4"/>Save</>}</button></div></div>}

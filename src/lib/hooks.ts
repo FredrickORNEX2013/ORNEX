@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase, type VideoRecord, type ProfileRecord, type AdRecord, type CommentRecord } from '@/lib/supabase';
-import { getOrCreateUserId, getOrCreateUsername } from '@/lib/user';
+import { supabase, type VideoRecord, type ProfileRecord, type CommentRecord } from '@/lib/supabase';
+import { getOrCreateCurrentProfile } from '@/lib/user';
 import { fetchVimeoVideos, mergeVideos } from '@/lib/vimeo';
 import {
   loadWatchState,
@@ -41,21 +41,11 @@ function normalizeVideo(v: Record<string, unknown>): VideoRecord {
 
 async function fetchAllVideos(): Promise<{ videos: VideoRecord[]; error: string | null }> {
   const [dbRes, vimeoVideos] = await Promise.all([
-    supabase
-      .from('videos')
-      .select('*')
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
-      .limit(100),
+    supabase.from('videos').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100),
     fetchVimeoVideos(),
   ]);
-
-  console.log('ORNEX LOADED', dbRes.data?.length);
   if (dbRes.error) console.error(dbRes.error);
-
-  const dbVideos = dbRes.error
-    ? []
-    : ((dbRes.data || []) as Record<string, unknown>[]).map(normalizeVideo);
+  const dbVideos = dbRes.error ? [] : ((dbRes.data || []) as Record<string, unknown>[]).map(normalizeVideo);
   return { videos: mergeVideos(dbVideos, vimeoVideos), error: dbRes.error?.message ?? null };
 }
 
@@ -98,42 +88,41 @@ export function useProfile() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const userId = getOrCreateUserId();
-      const username = getOrCreateUsername();
-
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (existing) {
-        setProfile(existing as ProfileRecord);
-        setLoading(false);
-        if (!existing.role || existing.role === 'user') {
-          await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId);
+    let cancelled = false;
+    const loadProfile = async () => {
+      setLoading(true);
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (!user) {
+          if (!cancelled) setProfile(null);
+          return;
         }
-        return;
-      }
 
-      const { data: created, error } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          username,
-          display_name: username.replace('_', ' '),
-          avatar_color: '#CC0000',
-          role: 'admin',
-        })
-        .select()
-        .single();
-
-      if (!error && created) {
-        setProfile(created as ProfileRecord);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (error) throw error;
+        const current = data ?? await getOrCreateCurrentProfile(user);
+        if (!cancelled) setProfile(current as ProfileRecord | null);
+      } catch (error) {
+        console.error('Unable to load authenticated profile', error);
+        if (!cancelled) setProfile(null);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    })();
+    };
+
+    void loadProfile();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      void loadProfile();
+    });
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { profile, setProfile, loading };
@@ -151,10 +140,7 @@ export function useProfiles(userIds: string[]) {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', uncached);
+      const { data } = await supabase.from('profiles').select('*').in('id', uncached);
       if (data) {
         const map: Record<string, ProfileRecord> = {};
         data.forEach((p) => {
@@ -171,103 +157,81 @@ export function useProfiles(userIds: string[]) {
 
 export function useCommentCount(videoId: string) {
   const [count, setCount] = useState(0);
-
   useEffect(() => {
     (async () => {
-      const { count } = await supabase
-        .from('comments')
-        .select('*', { count: 'exact', head: true })
-        .eq('video_id', videoId);
+      const { count } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('video_id', videoId);
       setCount(count || 0);
     })();
   }, [videoId]);
-
   return count;
 }
 
 export function useComments(videoId: string) {
   const [comments, setComments] = useState<CommentRecord[]>([]);
   const [loading, setLoading] = useState(true);
-
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('comments')
-      .select('*')
-      .eq('video_id', videoId)
-      .order('created_at', { ascending: false });
+    const { data } = await supabase.from('comments').select('*').eq('video_id', videoId).order('created_at', { ascending: false });
     setComments((data || []) as CommentRecord[]);
     setLoading(false);
   }, [videoId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  useEffect(() => { void load(); }, [load]);
   const addComment = async (text: string, userId: string) => {
-    await supabase.from('comments').insert({ video_id: videoId, user_id: userId, text });
+    if (!userId) throw new Error('Sign in to comment.');
+    const { error } = await supabase.from('comments').insert({ video_id: videoId, user_id: userId, text });
+    if (error) throw error;
     await load();
   };
-
   return { comments, loading, addComment, reload: load };
 }
 
 export function useLikeToggle(videoId: string, currentLikes: number, userId: string) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(currentLikes);
-
   useEffect(() => {
     setLikeCount(currentLikes);
+    if (!userId) { setLiked(false); return; }
     (async () => {
-      const { data } = await supabase
-        .from('likes')
-        .select('id')
-        .eq('video_id', videoId)
-        .eq('user_id', userId)
-        .maybeSingle();
+      const { data } = await supabase.from('likes').select('id').eq('video_id', videoId).eq('user_id', userId).maybeSingle();
       setLiked(!!data);
     })();
   }, [videoId, currentLikes, userId]);
-
   const toggleLike = async () => {
+    if (!userId) throw new Error('Sign in to like videos.');
     if (liked) {
-      await supabase.from('likes').delete().eq('video_id', videoId).eq('user_id', userId);
-      const newCount = likeCount - 1;
+      const { error } = await supabase.from('likes').delete().eq('video_id', videoId).eq('user_id', userId);
+      if (error) throw error;
+      const newCount = Math.max(0, likeCount - 1);
       setLikeCount(newCount);
       setLiked(false);
       await supabase.from('videos').update({ likes: newCount }).eq('id', videoId);
     } else {
-      await supabase.from('likes').insert({ video_id: videoId, user_id: userId });
+      const { error } = await supabase.from('likes').insert({ video_id: videoId, user_id: userId });
+      if (error) throw error;
       const newCount = likeCount + 1;
       setLikeCount(newCount);
       setLiked(true);
       await supabase.from('videos').update({ likes: newCount }).eq('id', videoId);
     }
   };
-
   return { liked, likeCount, toggleLike };
 }
 
 export function useAds() {
   const [ads, setAds] = useState<AdRecord[]>([]);
-
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from('ads')
-        .select('*')
-        .eq('active', true)
-        .order('created_at', { ascending: false });
+      const { data } = await supabase.from('ads').select('*').eq('active', true).order('created_at', { ascending: false });
       if (data) setAds(data as AdRecord[]);
     })();
   }, []);
-
   return { ads };
 }
+
+type AdRecord = { id: string; [key: string]: unknown };
 
 export function useWatchTime(active: boolean) {
   const [state, setState] = useState<WatchState>(() => loadWatchState());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
     if (active) {
       intervalRef.current = setInterval(() => {
@@ -281,11 +245,8 @@ export function useWatchTime(active: boolean) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [active]);
-
   const claimReward = useCallback(() => {
     setState((prev) => {
       const next = { ...prev, claimedRewards: prev.claimedRewards + 50 };
@@ -293,6 +254,5 @@ export function useWatchTime(active: boolean) {
       return next;
     });
   }, []);
-
   return { state, claimReward };
 }

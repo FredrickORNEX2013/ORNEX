@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  },
 );
 
 export type VideoRecord = {
@@ -49,19 +56,6 @@ export type CommentRecord = {
   video_id: string;
   user_id: string | null;
   text: string;
-  created_at: string;
-};
-
-export type AdRecord = {
-  id: string;
-  brand_name: string;
-  video_url: string;
-  learn_more_url: string | null;
-  skip_after_seconds: number;
-  impressions: number;
-  clicks: number;
-  active: boolean;
-  storage_path: string | null;
   created_at: string;
 };
 

@@ -2,9 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
-// https://vitejs.dev/config/
+// Relative asset URLs work both on GitHub Pages at /ORNEX/ and on a domain root.
 export default defineConfig({
-  base: '/ORNEX/',
+  base: './',
   plugins: [react()],
   resolve: {
     alias: {

@@ -30,21 +30,41 @@ function normalizeConfig(value: Record<string, unknown>): AppConfig {
   };
 }
 
-export function getAppConfig(): AppConfig { return cachedConfig || DEFAULT_CONFIG; }
+export function getAppConfig(): AppConfig {
+  return cachedConfig || DEFAULT_CONFIG;
+}
 
 export function useAppConfig() {
   const [config, setConfig] = useState<AppConfig>(cachedConfig || DEFAULT_CONFIG);
+
   useEffect(() => {
-    if (cachedConfig) { setConfig(cachedConfig); return; }
-    (async () => {
-      const { data } = await supabase.from('app_settings').select('*').eq('key', 'app_config').maybeSingle();
-      if (data?.value) {
-        cachedConfig = normalizeConfig(data.value as Record<string, unknown>);
-        setConfig(cachedConfig);
+    let cancelled = false;
+    if (cachedConfig) {
+      setConfig(cachedConfig);
+      return () => { cancelled = true; };
+    }
+
+    const loadConfig = async () => {
+      try {
+        const { data, error } = await supabase.from('app_settings').select('*').eq('key', 'app_config').maybeSingle();
+        if (error) throw error;
+        if (data?.value) {
+          cachedConfig = normalizeConfig(data.value as Record<string, unknown>);
+          if (!cancelled) setConfig(cachedConfig);
+        }
+      } catch {
+        // Keep the local defaults so a missing or unavailable Supabase never blocks startup.
+        if (!cancelled) setConfig(cachedConfig || DEFAULT_CONFIG);
       }
-    })();
+    };
+
+    void loadConfig();
+    return () => { cancelled = true; };
   }, []);
+
   return config;
 }
 
-export function clearAppConfigCache() { cachedConfig = null; }
+export function clearAppConfigCache() {
+  cachedConfig = null;
+}

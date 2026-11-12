@@ -34,7 +34,7 @@ export default function Splash({ onDone }: { onDone: () => void }) {
       }`}
     >
       <img
-        src="/IMG-20261109-WA9849.jpg"
+        src={`${import.meta.env.BASE_URL}IMG-20261109-WA9849.jpg`}
         alt="ORNEX"
         fetchPriority="high"
         className="ornex-splash-image absolute inset-0 h-full w-full object-cover object-center"

@@ -9,6 +9,13 @@ export type ProfileRecord = AppProfile & {
   is_channel?: boolean;
 };
 
+type ProfileListener = (profile: ProfileRecord) => void;
+const profileListeners = new Set<ProfileListener>();
+
+export function notifyProfileUpdated(profile: ProfileRecord) {
+  profileListeners.forEach((listener) => listener(profile));
+}
+
 type VideosListener = (videos: VideoRecord[] | null) => void;
 let videosCache: VideoRecord[] | null = null;
 const videosListeners = new Set<VideosListener>();
@@ -80,7 +87,11 @@ export function useProfiles(profileIds: string[] = []) {
       (data || []).forEach((profile) => { indexed[profile.id] = profile as ProfileRecord; });
       setProfiles(indexed);
     });
-    return () => { cancelled = true; };
+    const listener: ProfileListener = (profile) => {
+      if (ids.includes(profile.id)) setProfiles((current) => ({ ...current, [profile.id]: profile }));
+    };
+    profileListeners.add(listener);
+    return () => { cancelled = true; profileListeners.delete(listener); };
   }, [idsKey]);
 
   return profiles;
@@ -127,6 +138,11 @@ export function useComments(videoId: string) {
   }, [videoId]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const listener: ProfileListener = (profile) => setComments((current) => current.map((comment) => comment.user_id === profile.id ? { ...comment, username: profile.username, display_name: profile.display_name, avatar_url: profile.avatar_url } : comment));
+    profileListeners.add(listener);
+    return () => { profileListeners.delete(listener); };
+  }, []);
 
   const addComment = useCallback(async (text: string, userId: string) => {
     const value = text.trim();

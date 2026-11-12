@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, MoreVertical, Plus, Send, Share2, X } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Plus, Play, Send, Share2, X } from 'lucide-react';
 import { useComments, useLikeToggle, useProfiles, useVideos } from '@/lib/hooks';
 import { type VideoRecord, supabase } from '@/lib/supabase';
 import { getCurrentUserId } from '@/lib/user';
@@ -75,7 +75,7 @@ function ShortSlide({ video, onPostClick }: { video: VideoRecord; onPostClick: (
       <div className="min-w-0">
         <div className="mb-2 flex items-center gap-2">
           <div className="relative h-10 w-10 shrink-0 rounded-full border-2 border-[#D61E2B] bg-black p-0.5">
-            {profile?.avatar_url || video.avatar_url ? <img src={profile?.avatar_url || video.avatar_url || ''} alt="" className="h-full w-full rounded-full object-cover"/> : <span className="flex h-full w-full items-center justify-center rounded-full bg-white/10 text-sm font-bold">{displayName.slice(0, 1).toUpperCase()}</span>}
+            {profile?.avatar_url || video.avatar_url ? <img src={profile?.avatar_url || video.avatar_url || ''} alt={`${displayName}'s profile`} className="h-full w-full rounded-full object-cover"/> : <span className="flex h-full w-full items-center justify-center rounded-full bg-white/10 text-sm font-bold">{displayName.slice(0, 1).toUpperCase()}</span>}
           </div>
           <p className="truncate text-sm font-bold text-white">@{username}</p>
           {video.user_id && userId !== video.user_id && <button onClick={() => void toggleFollow()} aria-label={following ? 'Unfollow channel' : 'Follow channel'} className="pointer-events-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white bg-black text-white"><Plus className={`h-4 w-4 ${following ? 'rotate-45' : ''}`}/></button>}
@@ -86,11 +86,11 @@ function ShortSlide({ video, onPostClick }: { video: VideoRecord; onPostClick: (
       </div>
     </div>
     <div className="absolute bottom-24 right-3 z-20 flex flex-col items-center gap-5">
-      <button onClick={() => void toggleLike()} aria-label={liked ? 'Unlike video' : 'Like video'} className="flex flex-col items-center gap-1 text-white"><Heart className={`h-7 w-7 ${liked ? 'fill-[#D61E2B] text-[#D61E2B]' : 'text-white'}`}/><span className="text-xs font-semibold">{likeCount}</span></button>
-      <button onClick={() => setCommentsOpen(true)} aria-label="Open comments" className="flex flex-col items-center gap-1 text-white"><MessageCircle className="h-7 w-7"/><span className="text-xs font-semibold">Comment</span></button>
+      <button onClick={() => void toggleLike()} aria-label={liked ? 'Unlike video' : 'Like video'} className="flex flex-col items-center gap-1 text-white"><Heart className={`h-7 w-7 ${liked ? 'fill-[#D61E2B] text-[#D61E2B]' : ''}`}/><span className="text-xs font-semibold">{likeCount}</span></button>
+      <button onClick={() => setCommentsOpen(true)} aria-label="Open comments" className="flex flex-col items-center gap-1 text-white"><MessageCircle className="h-7 w-7"/><span className="text-xs font-semibold">Comments</span></button>
       <button onClick={() => void share()} aria-label="Share video" className="flex flex-col items-center gap-1 text-white"><Share2 className="h-7 w-7"/><span className="text-xs font-semibold">Share</span></button>
       <button onClick={() => setMoreOpen((open) => !open)} aria-label="More video options" className="text-white"><MoreVertical className="h-7 w-7"/></button>
-      {moreOpen && <div className="absolute bottom-0 right-10 w-36 border border-white/30 bg-black p-2 text-xs"><button onClick={() => { setMoreOpen(false); window.alert('Thanks. This video has been reported for review.'); }} className="w-full p-2 text-left text-white">Report video</button></div>}
+      {moreOpen && <div className="absolute bottom-0 right-10 w-36 border border-white/30 bg-black p-2 text-xs"><button onClick={() => { setMoreOpen(false); window.alert('Thanks. This video has been reported.'); }}>Report video</button></div>}
     </div>
     <div className="absolute inset-x-0 bottom-0 z-30 h-[2px] bg-white/20"><div className="h-full bg-[#D61E2B]" style={{ width: `${progress}%` }}/></div>
     {commentsOpen && <CommentsSheet video={video} userId={userId} onClose={() => setCommentsOpen(false)}/>}
@@ -109,10 +109,13 @@ function CommentsSheet({ video, userId, onClose }: { video: VideoRecord; userId:
     setText('');
   };
   return <div className="absolute inset-0 z-40 flex items-end bg-black/55" onClick={onClose}>
-    <section role="dialog" aria-modal="true" aria-label="Comments" onClick={(event) => event.stopPropagation()} className="flex max-h-[72%] w-full flex-col rounded-t-2xl border-t border-white/20 bg-black pb-[env(safe-area-inset-bottom)]">
+    <section role="dialog" aria-modal="true" aria-label="Comments" onClick={(event) => event.stopPropagation()} className="flex max-h-[72%] w-full flex-col rounded-t-2xl border-t border-white/20 bg-[#101010]">
       <header className="flex items-center justify-between border-b border-white/15 px-4 py-3"><h3 className="font-bold">Comments · {comments.length}</h3><button onClick={onClose} aria-label="Close comments"><X className="h-5 w-5"/></button></header>
-      <div className="min-h-24 flex-1 space-y-4 overflow-y-auto p-4">{loading ? <p className="text-sm text-white/60">Loading comments…</p> : comments.length ? comments.map((comment) => <p key={comment.id} className="text-sm"><span className="mr-2 font-bold">{comment.display_name || comment.username || 'ORNEX user'}</span>{comment.text}</p>) : <p className="py-8 text-center text-sm text-white/60">Be the first to comment.</p>}</div>
-      <form onSubmit={(event) => void submit(event)} className="flex gap-2 border-t border-white/15 p-3"><input value={text} onChange={(event) => setText(event.target.value)} placeholder={userId ? 'Add a comment…' : 'Sign in to comment'} disabled={!userId} className="min-w-0 flex-1 border border-white/25 bg-black px-3 py-2 text-sm text-white placeholder:text-white/50"/><button type="submit" disabled={!userId || !text.trim()} aria-label="Send comment" className="bg-[#D61E2B] px-3 text-white disabled:opacity-50"><Send className="h-4 w-4"/></button></form>
+      <div className="min-h-24 flex-1 space-y-4 overflow-y-auto p-4">{loading ? <p className="text-sm text-white/60">Loading comments…</p> : comments.length ? comments.map((comment) => <div key={comment.id} className="flex items-start gap-2 text-sm">
+        {comment.avatar_url ? <img src={comment.avatar_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover"/> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold">{(comment.display_name || comment.username || 'O').slice(0, 1).toUpperCase()}</span>}
+        <p><span className="mr-2 font-bold">{comment.display_name || comment.username || 'ORNEX user'}</span>{comment.text}</p>
+      </div>) : <p className="py-8 text-center text-sm text-white/60">Be the first to comment.</p>}</div>
+      <form onSubmit={(event) => void submit(event)} className="flex gap-2 border-t border-white/15 p-3"><input value={text} onChange={(event) => setText(event.target.value)} placeholder={userId ? 'Add a comment…' : 'Sign in to comment'} disabled={!userId} className="min-w-0 flex-1 rounded-full bg-white/10 px-4 py-2 text-sm outline-none"/><button type="submit" disabled={!text.trim() || !userId} aria-label="Send comment" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D61E2B] disabled:opacity-50"><Send className="h-4 w-4"/></button></form>
     </section>
   </div>;
 }

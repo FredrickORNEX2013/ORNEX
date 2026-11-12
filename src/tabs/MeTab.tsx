@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Pencil, Play, Plus, Settings, Share2 } from 'lucide-react';
-import { useProfile, useVideos } from '@/lib/hooks';
-import { supabase, type ProfileRecord, type VideoRecord } from '@/lib/supabase';
+import { useProfile, useVideos, type ProfileRecord } from '@/lib/hooks';
+import { notifyProfileUpdated } from '@/lib/hooks';
+import { supabase, type VideoRecord } from '@/lib/supabase';
 import { formatViews } from '@/lib/utils';
 import { getCurrentUserId } from '@/lib/user';
 
@@ -18,7 +19,6 @@ export default function MeTab() {
   const [followerCount, setFollowerCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [avatarError, setAvatarError] = useState('');
   const [avatarSaving, setAvatarSaving] = useState(false);
@@ -69,37 +69,46 @@ export default function MeTab() {
     } catch { /* Sharing can be dismissed. */ }
   };
 
-  const chooseAvatar = (file?: File) => {
+  const chooseAvatar = async (file?: File) => {
     setAvatarError('');
     if (!file) return;
     if (!file.type.startsWith('image/')) { setAvatarError('Choose an image file.'); return; }
     if (file.size > 5 * 1024 * 1024) { setAvatarError('Choose an image smaller than 5 MB.'); return; }
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    setSelectedAvatar(file);
-    setAvatarPreview(URL.createObjectURL(file));
-  };
+    if (!userId) { setAvatarError('Sign in before changing your profile photo.'); return; }
 
-  const saveAvatar = async () => {
-    if (!selectedAvatar || !userId) { setAvatarError('Sign in before changing your profile photo.'); return; }
+    const preview = URL.createObjectURL(file);
+    setAvatarPreview(preview);
     setAvatarSaving(true);
-    setAvatarError('');
-    const safeName = selectedAvatar.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${userId}/${Date.now()}-${safeName}`;
+    const previousProfile = profile;
+    if (profile) notifyProfileUpdated({ ...profile, avatar_url: preview });
     try {
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, selectedAvatar, { upsert: true, contentType: selectedAvatar.type });
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${userId}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
       const imageUrl = `${urlData.publicUrl}?v=${Date.now()}`;
-      const { data, error } = await supabase.from('profiles').update({ avatar_url: imageUrl }).eq('id', userId).select().single();
-      if (error || !data) throw error || new Error('Could not save your profile photo.');
-      setProfile(data as ProfileRecord);
-      await supabase.from('videos').update({ avatar_url: imageUrl }).eq('user_id', userId);
-      setSelectedAvatar(null);
+      const { data, error } = await supabase.from('profiles').update({ avatar_url: imageUrl }).eq('id', userId).select('*').maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Could not save your profile photo. Check that your profile exists and you are signed in.');
+      const updated = data as ProfileRecord;
+      setProfile(updated);
+      notifyProfileUpdated(updated);
       setAvatarPreview('');
       setToast('Profile photo saved ✅');
+      const { error: videoError } = await supabase.from('videos').update({ avatar_url: imageUrl }).eq('user_id', userId);
+      if (videoError) console.error('Could not update cached video avatars:', videoError.message);
     } catch (error) {
-      setAvatarError(error instanceof Error ? error.message : 'Could not upload your photo.');
-    } finally { setAvatarSaving(false); }
+      const message = error instanceof Error ? error.message : 'Could not upload your photo.';
+      setAvatarError(message);
+      setAvatarPreview('');
+      if (previousProfile) notifyProfileUpdated(previousProfile);
+    } finally {
+      setAvatarSaving(false);
+    }
   };
 
   return <div className="ornex-me min-h-[calc(100dvh-3.5rem-70px)] overflow-y-auto bg-[#000000] pb-[120px] text-[#FFFFFF]">
@@ -113,23 +122,22 @@ export default function MeTab() {
         {avatarUrl ? <img src={avatarUrl} alt={`${displayName}'s profile`} className="h-full w-full object-cover" /> : (displayName.trim().slice(0, 2).toUpperCase() || 'OU')}
         {avatarSaving && <span className="absolute inset-0 flex items-center justify-center bg-[#000000]/80 text-xs">Uploading...</span>}
       </button>
-      <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={(event) => { chooseAvatar(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
-      {selectedAvatar && <div className="mx-auto mt-3 flex max-w-xs items-center justify-center gap-2"><button type="button" onClick={() => void saveAvatar()} disabled={avatarSaving} className="bg-[#D61E2B] px-4 py-2 text-sm font-bold text-[#FFFFFF] disabled:opacity-60">{avatarSaving ? 'Uploading...' : 'Save photo'}</button><button type="button" onClick={() => { setSelectedAvatar(null); setAvatarPreview(''); setAvatarError(''); }} disabled={avatarSaving} className="border border-[#FFFFFF]/60 px-4 py-2 text-sm">Cancel</button></div>}
+      <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={(event) => { void chooseAvatar(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
+      {avatarError && <p role="alert" className="mx-auto mt-2 max-w-xs text-sm text-[#D61E2B]">{avatarError}</p>}
       <h2 className="mt-3 text-base font-bold">{displayName}</h2>
       {bio && <p className="mx-auto mt-1 max-w-xs whitespace-pre-wrap text-sm leading-5 text-[#FFFFFF]/60">{bio}</p>}
-      {avatarError && <p role="alert" className="mx-auto mt-2 max-w-xs text-sm text-[#D61E2B]">{avatarError}</p>}
       <div className="mx-auto mt-5 grid max-w-sm grid-cols-3 text-center"><Stat value={followingCount} label="Following"/><Stat value={followerCount} label="Followers"/><Stat value={likesCount} label="Likes"/></div>
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <button type="button" onClick={() => setShowEditProfile(true)} className="flex h-10 items-center justify-center gap-2 rounded-md bg-[#FFFFFF] text-sm font-bold text-[#000000]"><Pencil className="h-4 w-4"/> Edit Profile</button>
-        <button type="button" onClick={() => void shareProfile()} className="flex h-10 items-center justify-center gap-2 rounded-md border border-[#FFFFFF] bg-[#000000] text-sm font-bold text-[#FFFFFF]"><Share2 className="h-4 w-4"/> Share Profile</button>
+        <button type="button" onClick={() => setShowEditProfile(true)} className="flex h-10 items-center justify-center gap-2 rounded-md bg-[#FFFFFF] text-sm font-bold text-[#000000]"><Pencil className="h-4 w-4"/> Edit profile</button>
+        <button type="button" onClick={() => void shareProfile()} className="flex h-10 items-center justify-center gap-2 rounded-md border border-[#FFFFFF] bg-[#000000] text-sm font-bold text-[#FFFFFF]"><Share2 className="h-4 w-4"/> Share profile</button>
       </div>
     </section>
 
     <div className="grid grid-cols-2 border-b border-[#FFFFFF]/20"><ProfileTabButton active={activeTab === 'videos'} label="Videos" onClick={() => setActiveTab('videos')}/><ProfileTabButton active={activeTab === 'liked'} label="Liked" onClick={() => setActiveTab('liked')}/></div>
-    {displayedVideos.length === 0 ? <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center"><div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#D61E2B]"><Plus className="h-8 w-8 text-[#D61E2B]" strokeWidth={2}/></div><p className="text-base font-bold">{activeTab === 'videos' ? 'No videos yet' : 'No liked videos yet'}</p>{activeTab === 'videos' && <p className="mt-1 text-sm text-[#FFFFFF]/60">Your videos will appear here.</p>}</div> : <div className="grid grid-cols-3 gap-px bg-[#000000]">{displayedVideos.map((video) => <VideoTile key={video.id} video={video}/>)}</div>}
+    {displayedVideos.length === 0 ? <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center"><div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-white/30"><Play className="h-6 w-6"/></div><p className="text-sm text-white/60">{activeTab === 'videos' ? 'No videos yet' : 'No liked videos yet'}</p><button type="button" onClick={() => setShowEditProfile(true)} className="mt-4 flex items-center gap-2 bg-[#D61E2B] px-4 py-2 text-sm font-bold"><Plus className="h-4 w-4"/> Edit profile</button></div> : <div className="grid grid-cols-3 gap-px">{displayedVideos.map((video) => <VideoTile key={video.id} video={video}/>)}</div>}
     {profileLoading && <div className="sr-only" aria-live="polite">Loading profile</div>}
     {toast && <div role="status" className="fixed bottom-24 left-1/2 z-[100000] -translate-x-1/2 border border-[#FFFFFF]/30 bg-[#000000] px-4 py-2 text-sm text-[#FFFFFF]">{toast}</div>}
-    {showEditProfile && <EditProfileModal profile={profile as EditableProfile | null} userId={userId} onClose={() => setShowEditProfile(false)} onSaved={(updated) => { setProfile(updated); setToast('Saved ✅'); setShowEditProfile(false); }}/ >}
+    {showEditProfile && <EditProfileModal profile={profile as EditableProfile | null} userId={userId} onClose={() => setShowEditProfile(false)} onSaved={(updated) => { setProfile(updated); notifyProfileUpdated(updated); setToast('Saved ✅'); setShowEditProfile(false); }}/ >}
   </div>;
 }
 
@@ -142,7 +150,7 @@ function ProfileTabButton({ active, label, onClick }: { active: boolean; label: 
 }
 
 function VideoTile({ video }: { video: VideoRecord }) {
-  return <div className="relative aspect-[9/16] overflow-hidden bg-[#000000]">{video.thumbnail_url ? <img src={video.thumbnail_url} alt={video.caption || video.title || 'Video thumbnail'} loading="lazy" className="h-full w-full object-cover"/> : <video src={`${video.url}#t=0.1`} preload="metadata" muted className="h-full w-full object-cover"/>}<div className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-[#000000]/70 px-1.5 py-1 text-xs font-semibold"><Play className="h-3.5 w-3.5 fill-[#D61E2B] text-[#D61E2B]"/>{formatViews(video.views || 0)}</div></div>;
+  return <div className="relative aspect-[9/16] overflow-hidden bg-[#111111]">{video.thumbnail_url ? <img src={video.thumbnail_url} alt={video.caption || video.title || 'Video thumbnail'} loading="lazy" className="h-full w-full object-cover"/> : <div className="flex h-full items-center justify-center"><Play className="h-8 w-8 text-white/60"/></div>}<div className="absolute bottom-1 left-1 flex items-center gap-1 text-xs font-semibold"><Play className="h-3 w-3"/>{formatViews(video.views || 0)}</div></div>;
 }
 
 function EditProfileModal({ profile, userId, onClose, onSaved }: { profile: EditableProfile | null; userId: string | null; onClose: () => void; onSaved: (profile: ProfileRecord) => void }) {
@@ -185,16 +193,17 @@ function EditProfileModal({ profile, userId, onClose, onSaved }: { profile: Edit
       setSaving(false);
       return;
     }
-    const { data, error } = await supabase.from('profiles').update({ username: normalizedUsername, display_name: displayName.trim(), bio: bio.slice(0, 80) }).eq('id', userId).select().single();
+    const { data, error } = await supabase.from('profiles').update({ username: normalizedUsername, display_name: displayName.trim(), bio: bio.slice(0, 80) }).eq('id', userId).select('*').maybeSingle();
     if (error || !data) {
-      setMessage(error?.code === '23505' ? 'That username is already taken.' : error?.message || 'Could not save your profile.');
+      setMessage(error?.code === '23505' ? 'That username is already taken.' : error?.message || 'Could not save your profile. Check that you are signed in and editing your own profile.');
       if (error?.code === '23505') setAvailability('taken');
       setSaving(false);
       return;
     }
     const updated = data as ProfileRecord;
     onSaved(updated);
-    await supabase.from('videos').update({ username: normalizedUsername, display_name: displayName.trim() }).eq('user_id', userId);
+    const { error: videosError } = await supabase.from('videos').update({ username: normalizedUsername, display_name: displayName.trim() }).eq('user_id', userId);
+    if (videosError) console.error('Could not update cached video profile details:', videosError.message);
     setSaving(false);
   };
 
@@ -203,12 +212,12 @@ function EditProfileModal({ profile, userId, onClose, onSaved }: { profile: Edit
     <div role="dialog" aria-modal="true" aria-label="Edit profile" className="w-full max-w-sm border border-[#FFFFFF]/25 bg-[#000000] p-5" onClick={(event) => event.stopPropagation()}>
       <div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold">Edit profile</h2><button type="button" aria-label="Close" onClick={onClose} className="p-1 text-[#FFFFFF]"><span aria-hidden="true">×</span></button></div>
       <label htmlFor="profile-name" className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Name</label>
-      <input id="profile-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} className="mb-4 w-full border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]"/>
+      <input id="profile-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} className="mb-4 w-full border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2 text-sm text-white outline-none focus:border-[#D61E2B]"/>
       <label htmlFor="profile-username" className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Username</label>
       <div className="flex items-center border border-[#FFFFFF]/25 px-3 focus-within:border-[#D61E2B]"><span className="text-sm text-[#FFFFFF]/60">@</span><input id="profile-username" value={username} onChange={(event) => setUsername(event.target.value)} maxLength={25} className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#FFFFFF] outline-none"/></div>
       {availabilityText && <p aria-live="polite" className={`mb-4 mt-1 text-xs ${availability === 'available' ? 'text-[#FFFFFF]' : availability === 'checking' ? 'text-[#FFFFFF]/60' : 'text-[#D61E2B]'}`}>{availabilityText}</p>}
       <label htmlFor="profile-bio" className="mb-1 block text-xs font-medium text-[#FFFFFF]/60">Bio</label>
-      <textarea id="profile-bio" value={bio} onChange={(event) => setBio(event.target.value.slice(0, 80))} maxLength={80} rows={3} className="w-full resize-none border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2 text-sm text-[#FFFFFF] outline-none focus:border-[#D61E2B]"/>
+      <textarea id="profile-bio" value={bio} onChange={(event) => setBio(event.target.value.slice(0, 80))} maxLength={80} rows={3} className="w-full resize-none border border-[#FFFFFF]/25 bg-[#000000] px-3 py-2 text-sm text-white outline-none focus:border-[#D61E2B]"/>
       <p className="mb-4 text-right text-xs text-[#FFFFFF]/50">{bio.length}/80</p>
       {message && <p role="alert" className="mb-3 text-sm text-[#D61E2B]">{message}</p>}
       <button type="button" onClick={() => void handleSave()} disabled={saving || !userId || availability !== 'available' || !displayName.trim()} className="flex w-full items-center justify-center gap-2 bg-[#D61E2B] py-3 text-sm font-bold text-[#FFFFFF] disabled:opacity-50">{saving ? 'Saving…' : <><Check className="h-4 w-4"/> Save</>}</button>

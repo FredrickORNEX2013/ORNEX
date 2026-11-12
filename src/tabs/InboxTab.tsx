@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Settings, Users, Activity, UserPlus, UserCheck, Check, X } from 'lucide-react';
 import { supabase, type ProfileRecord } from '@/lib/supabase';
-import { getOrCreateUserId } from '@/lib/user';
+import { getCurrentUserId } from '@/lib/user';
 import { formatTimeAgo } from '@/lib/format';
 import Avatar from '@/components/Avatar';
 
@@ -10,7 +10,8 @@ type TabKey = 'friends' | 'activities' | 'following' | 'followers' | 'requests';
 export default function InboxTab() {
   const [tab, setTab] = useState<TabKey>('friends');
   const [search, setSearch] = useState('');
-  const userId = getOrCreateUserId();
+  const [userId, setUserId] = useState('');
+useEffect(() => { getCurrentUserId().then((id) => setUserId(id ?? '')); }, []);
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'friends', label: 'Friends' }, { key: 'activities', label: 'Activities' }, { key: 'following', label: 'Following' }, { key: 'followers', label: 'Followers' }, { key: 'requests', label: 'Requests' },
   ];

@@ -4,6 +4,7 @@ import BottomNav, { type TabKey } from '@/components/BottomNav';
 import ForYouTab from '@/tabs/ForYouTab';
 import ExploreTab from '@/tabs/ExploreTab';
 import PostTab from '@/tabs/PostTab';
+import LiveTab from '@/tabs/LiveTab';
 import InboxTab from '@/tabs/InboxTab';
 import MeTab from '@/tabs/MeTab';
 import AdminPanel from '@/components/AdminPanel';
@@ -37,10 +38,7 @@ function useBoltKill() {
     const observer = new MutationObserver(kill);
     observer.observe(document.body, { childList: true, subtree: true });
     const interval = window.setInterval(kill, 500);
-    return () => {
-      observer.disconnect();
-      window.clearInterval(interval);
-    };
+    return () => { observer.disconnect(); window.clearInterval(interval); };
   }, []);
 }
 
@@ -49,58 +47,35 @@ export default function App() {
   const config = useAppConfig();
   const [activeTab, setActiveTab] = useState<TabKey>('foryou');
   const [showSplash, setShowSplash] = useState(() => {
-    try {
-      return window.localStorage.getItem('ornex-splash-seen') !== 'true';
-    } catch {
-      return true;
-    }
+    try { return window.localStorage.getItem('ornex-splash-seen') !== 'true'; } catch { return true; }
   });
   const [loading, setLoading] = useState(true);
-  const finishSplash = useCallback(() => {
-    setLoading(false);
-    setShowSplash(false);
-  }, []);
-
+  const finishSplash = useCallback(() => { setLoading(false); setShowSplash(false); }, []);
   useBoltKill();
-
   useEffect(() => {
-    const fallbackTimer = window.setTimeout(() => {
-      setLoading(false);
-      setShowSplash(false);
-    }, 2500);
+    const fallbackTimer = window.setTimeout(() => { setLoading(false); setShowSplash(false); }, 2500);
     return () => window.clearTimeout(fallbackTimer);
   }, []);
-
   useEffect(() => {
-    if (config.showTabs?.length && !config.showTabs.includes(activeTab)) {
-      setActiveTab(config.showTabs[0] as TabKey);
-    }
+    if (config.showTabs?.length && !config.showTabs.includes(activeTab) && activeTab !== 'live') setActiveTab(config.showTabs[0] as TabKey);
   }, [config.showTabs, activeTab]);
-
-  if (hash === '#/admin' || hash === '#admin') return <AdminPanel />;
-
+  if (hash === '#/admin' || hash === '#admin') return <AdminPanel/>;
   const renderTab = () => {
     switch (activeTab) {
-      case 'foryou': return <ForYouTab onPostClick={() => setActiveTab('post')} />;
-      case 'explore': return <ExploreTab />;
-      case 'post': return <PostTab />;
-      case 'inbox': return <InboxTab />;
-      case 'me': return <MeTab />;
-      default: return <ForYouTab onPostClick={() => setActiveTab('post')} />;
+      case 'foryou': return <ForYouTab onPostClick={() => setActiveTab('post')}/>;
+      case 'explore': return <ExploreTab/>;
+      case 'post': return <PostTab/>;
+      case 'live': return <LiveTab/>;
+      case 'inbox': return <InboxTab/>;
+      case 'me': return <MeTab/>;
+      default: return <ForYouTab onPostClick={() => setActiveTab('post')}/>;
     }
   };
-
   const isForYou = activeTab === 'foryou';
-  return (
-    <div aria-busy={loading} className="flex h-[100dvh] flex-col bg-black text-white">
-      {!isForYou && <Header appName={config.appName} />}
-      <main className="min-h-0 flex-1 overflow-hidden bg-black">
-        <div key={activeTab} className="h-full w-full transition-none">
-          {renderTab()}
-        </div>
-      </main>
-      <BottomNav active={activeTab} onChange={setActiveTab} visibleTabs={config.showTabs} />
-      {showSplash && <Splash onDone={finishSplash} />}
-    </div>
-  );
+  return <div aria-busy={loading} className="flex h-[100dvh] flex-col bg-black text-white">
+    {!isForYou && <Header appName={config.appName}/>}
+    <main className="min-h-0 flex-1 overflow-hidden bg-black"><div key={activeTab} className="h-full w-full transition-none">{renderTab()}</div></main>
+    <BottomNav active={activeTab} onChange={setActiveTab} visibleTabs={config.showTabs}/>
+    {showSplash && <Splash onDone={finishSplash}/>}
+  </div>;
 }

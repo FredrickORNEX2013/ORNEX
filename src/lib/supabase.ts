@@ -19,6 +19,11 @@ export type VideoRecord = {
   views: number;
   created_at: string;
   status: 'pending' | 'approved' | 'rejected';
+  type?: 'SHORT' | 'LONG' | string | null;
+  duration_seconds?: number | null;
+  is_live?: boolean;
+  is_channel?: boolean;
+  thumbnail_url?: string | null;
   username?: string | null;
   display_name?: string | null;
   avatar_url?: string | null;

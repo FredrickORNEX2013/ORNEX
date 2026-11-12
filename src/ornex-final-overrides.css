@@ -1,0 +1,38 @@
+/* Final palette guard for legacy colors that remain in arbitrary Tailwind classes. */
+:root {
+  --ornex-purple: #D61E2B;
+  --ornex-violet: #D61E2B;
+  --ornex-lilac: #FFFFFF;
+  --ornex-red: #D61E2B;
+  --ornex-border: rgba(255, 255, 255, .16);
+  --ornex-glow-soft: none;
+  --ornex-glow-active: none;
+}
+
+/* The active Explore category is the only purple background that should become red. */
+[class*="bg-[#A020F0]"], [class*="bg-[#8A2BE2]"], [class*="bg-purple-"], [class*="bg-violet-"], [class*="bg-fuchsia-"], [class*="bg-pink-"] {
+  background: #D61E2B !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+[class*="text-[#A020F0]"], [class*="text-[#8A2BE2]"], [class*="text-[#C084FC]"], [class*="text-purple-"], [class*="text-violet-"], [class*="text-fuchsia-"], [class*="text-pink-"] {
+  color: #FFFFFF !important;
+}
+[class*="border-[#A020F0]"], [class*="border-[#8A2BE2]"], [class*="border-purple-"], [class*="border-violet-"], [class*="border-fuchsia-"], [class*="border-pink-"] {
+  border-color: rgba(255, 255, 255, .2) !important;
+}
+
+/* Icons default to white; only the selected main-navigation icon is red. */
+svg { color: #FFFFFF !important; }
+.ornex-nav-active svg, .ornex-nav-item[aria-current="page"] svg { color: #D61E2B !important; }
+.ornex-nav-item[aria-current="page"] > span:last-child { color: #D61E2B !important; }
+
+/* Remove colored gradients, glow, and animated screen transitions. */
+[class*="gradient"], [class*="nebula"], [class*="aurora"] {
+  background-image: none !important;
+}
+[class*="purple-glow"], [class*="red-glow"], [class*="glow"] { box-shadow: none !important; }
+#root main, #root main > div {
+  animation: none !important;
+  transition: none !important;
+}

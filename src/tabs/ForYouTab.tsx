@@ -4,6 +4,7 @@ import { useComments, useLikeToggle, useProfiles, useVideos } from '@/lib/hooks'
 import { type VideoRecord, supabase } from '@/lib/supabase';
 import { getCurrentUserId } from '@/lib/user';
 import OrnexLogo from '@/components/OrnexLogo';
+import DemoVideoSeeder from '@/components/DemoVideoSeeder';
 
 function isShort(video: VideoRecord) {
   return video.is_live !== true && video.type?.toUpperCase() !== 'LONG' &&
@@ -17,6 +18,7 @@ export default function ForYouTab({ onPostClick }: { onPostClick: () => void }) 
 
   return <div ref={feedRef} aria-label="For You short videos" className="relative h-full snap-y snap-mandatory overflow-y-auto bg-black text-white [scrollbar-width:none]">
     <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-12 items-center justify-center bg-black/35"><OrnexLogo size={23}/></div>
+    <DemoVideoSeeder/>
     {shorts.length === 0 ? <section className="flex h-full snap-start flex-col items-center justify-center px-8 text-center">
       <OrnexLogo size={28}/><p className="mt-5 text-xl font-bold">No short videos yet</p>
       <p className="mt-2 text-sm text-white/70">For You only shows videos with a duration of 60 seconds or less.</p>

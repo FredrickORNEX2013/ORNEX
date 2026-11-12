@@ -156,7 +156,7 @@ export function useLikeToggle(videoId: string, initialCount = 0, userId = '') {
         userId ? supabase.from('likes').select('id').eq('video_id', videoId).eq('user_id', userId).maybeSingle() : Promise.resolve({ data: null, error: null }),
       ]);
       if (cancelled) return;
-      if (countResult.count !== null) setLikeCount(countResult.count);
+      if (countResult.count !== null) setLikeCount(Math.max(initialCount, countResult.count));
       const isLiked = !!likeResult.data;
       likedRef.current = isLiked;
       setLiked(isLiked);

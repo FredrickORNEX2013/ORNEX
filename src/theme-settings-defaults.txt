@@ -1,0 +1,18 @@
+// defaults
+  const [appName, setAppName] = useState('ORNEX');
+  const [primaryColor, setPrimaryColor] = useState('#000000');
+  const [accentColor, setAccentColor] = useState('#D61E2B');
+  const [logoIcon, setLogoIcon] = useState('play');
+  const [showTabs, setShowTabs] = useState<string[]>(['foryou', 'explore', 'post', 'inbox', 'me']);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ALL_TABS = [
+    { key: 'foryou', label: 'For You' },
+    { key: 'explore', label: 'Explore' },
+    { key: 'post', label: 'Post' },
+    { key: 'inbox', label: 'Inbox' },
+    { key: 'me', label: 'Me' },
+  ];

@@ -1,3 +1,4 @@
-.bg-purple-500, .bg-purple-600, .bg-violet-500, .bg-violet-600 { background-color: #FF0000 !important; }
-.text-purple-400, .text-purple-500, .text-violet-400 { color: #FF0000 !important; }
-.border-purple-500 { border-color: #FF0000 !important; }
+/* Keep legacy purple utility classes aligned with the restrained ORNEX accent. */
+.bg-purple-500, .bg-purple-600, .bg-violet-500, .bg-violet-600 { background-color: #D61E2B !important; }
+.text-purple-400, .text-purple-500, .text-violet-400 { color: #D61E2B !important; }
+.border-purple-500 { border-color: #D61E2B !important; }

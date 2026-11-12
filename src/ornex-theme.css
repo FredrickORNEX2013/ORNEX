@@ -1,0 +1,52 @@
+/* ORNEX restrained black, white, and matte-red theme. Loaded after the legacy palette so every existing screen keeps its behavior while receiving the updated colors. */
+:root {
+  color-scheme: dark;
+  --ornex-black: #000000;
+  --ornex-card: #111111;
+  --ornex-purple: #D61E2B;
+  --ornex-violet: #D61E2B;
+  --ornex-lilac: #FFFFFF;
+  --ornex-white: #FFFFFF;
+  --ornex-red: #D61E2B;
+  --ornex-border: rgba(255, 255, 255, .14);
+  --ornex-glow-soft: none;
+  --ornex-glow-active: none;
+}
+
+html, body, #root { background-color: #000000 !important; color: #FFFFFF !important; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline-color: #D61E2B !important; }
+input, textarea, select { background-color: #111111 !important; color: #FFFFFF !important; border-color: rgba(255,255,255,.2) !important; }
+input::placeholder, textarea::placeholder { color: rgba(255,255,255,.55) !important; opacity: 1; }
+
+/* Cards, panels, and search fields stay dark, never tinted or gradient-filled. */
+[class*="bg-white"], [class*="bg-neutral-"], [class*="bg-gray-"], [class*="bg-slate-"], [class*="bg-zinc-"], [class*="bg-stone-"] { background-color: #111111 !important; }
+[class*="bg-purple-"], [class*="bg-violet-"], [class*="bg-fuchsia-"], [class*="bg-pink-"], [class*="bg-blue-"], [class*="bg-indigo-"], [class*="bg-sky-"], [class*="bg-cyan-"], [class*="bg-teal-"], [class*="bg-green-"], [class*="bg-emerald-"], [class*="bg-lime-"], [class*="bg-yellow-"], [class*="bg-amber-"], [class*="bg-orange-"], [class*="bg-rose-"] { background-color: #111111 !important; }
+[class*="text-black"], [class*="text-gray-"], [class*="text-slate-"], [class*="text-zinc-"], [class*="text-stone-"], [class*="text-neutral-"], [class*="text-purple-"], [class*="text-violet-"], [class*="text-fuchsia-"], [class*="text-pink-"], [class*="text-blue-"], [class*="text-indigo-"], [class*="text-sky-"], [class*="text-cyan-"], [class*="text-teal-"], [class*="text-green-"], [class*="text-emerald-"], [class*="text-lime-"], [class*="text-yellow-"], [class*="text-amber-"], [class*="text-orange-"], [class*="text-rose-"] { color: #FFFFFF !important; }
+[class*="border-neutral-"], [class*="border-gray-"], [class*="border-slate-"], [class*="border-zinc-"], [class*="border-stone-"], [class*="border-white/"], [class*="border-purple-"], [class*="border-violet-"], [class*="border-fuchsia-"], [class*="border-pink-"], [class*="border-blue-"], [class*="border-indigo-"], [class*="border-sky-"], [class*="border-cyan-"], [class*="border-teal-"], [class*="border-green-"], [class*="border-emerald-"], [class*="border-lime-"], [class*="border-yellow-"], [class*="border-amber-"], [class*="border-orange-"], [class*="border-rose-"] { border-color: rgba(255,255,255,.16) !important; }
+
+/* Accent only for primary/legacy brand actions and small red utility accents. */
+button[class*="bg-purple-"], button[class*="bg-violet-"], button[class*="bg-fuchsia-"], button[class*="bg-pink-"], button[class*="bg-red-"], button[class*="bg-rose-"] { background-color: #D61E2B !important; color: #FFFFFF !important; }
+button[class*="bg-blue-"], button[class*="bg-indigo-"], button[class*="bg-sky-"], button[class*="bg-cyan-"], button[class*="bg-teal-"], button[class*="bg-green-"], button[class*="bg-emerald-"], button[class*="bg-lime-"], button[class*="bg-yellow-"], button[class*="bg-amber-"], button[class*="bg-orange-"] { background-color: #FFFFFF !important; color: #000000 !important; }
+[class*="bg-red-"], [class*="bg-rose-"], [class*="text-red-"], [class*="text-rose-"], [class*="border-red-"], [class*="border-rose-"] { --ornex-red: #D61E2B; }
+[class*="bg-red-"], [class*="bg-rose-"] { background-color: #D61E2B !important; }
+[class*="text-red-"], [class*="text-rose-"] { color: #D61E2B !important; }
+[class*="border-red-"], [class*="border-rose-"] { border-color: #D61E2B !important; }
+[class*="bg-[#FF"], [class*="bg-[#CC"], [class*="bg-[#D000"], [class*="bg-[#E000"], [class*="bg-[#FFD"], [class*="bg-[#FACC"], [class*="bg-[#EAB"] { background-color: #111111 !important; }
+[class*="text-[#FF"], [class*="text-[#CC"], [class*="text-[#D000"], [class*="text-[#E000"], [class*="text-[#FFD"], [class*="text-[#FACC"], [class*="text-[#EAB"] { color: #FFFFFF !important; }
+[class*="border-[#FF"], [class*="border-[#CC"], [class*="border-[#D000"], [class*="border-[#E000"], [class*="border-[#FFD"] { border-color: rgba(255,255,255,.16) !important; }
+
+/* Strip legacy purple glow, gradients, and stored inline brand colors. */
+[class*="gradient"], [class*="nebula"], [class*="aurora"] { background-image: none !important; box-shadow: none !important; }
+[class*="red-glow"], [class*="red-aurora"], [class*="red-nebula"] { background: #000000 !important; box-shadow: none !important; }
+[class*="rounded-2xl"][class*="border"], [class*="rounded-xl"][class*="border"] { border-color: rgba(255,255,255,.16) !important; box-shadow: none !important; }
+[style*="background-color"] { background-color: #111111 !important; }
+[style*="color:"] { color: #FFFFFF !important; }
+
+.ornex-bottom-nav { border-color: rgba(255,255,255,.14) !important; background: #000000 !important; box-shadow: none !important; backdrop-filter: none; }
+.ornex-nav-active { color: #D61E2B !important; background: transparent !important; box-shadow: none !important; }
+.ornex-nav-active svg, .ornex-nav-item[aria-current="page"] { color: #D61E2B !important; }
+.ornex-nav-post { color: #FFFFFF !important; background: #D61E2B !important; box-shadow: none !important; }
+.ornex-nav-item > span:last-child { color: rgba(255,255,255,.68) !important; }
+.ornex-nav-item[aria-current="page"] > span:last-child { color: #D61E2B !important; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }

@@ -11,13 +11,13 @@ export type AppConfig = {
 
 const DEFAULT_CONFIG: AppConfig = {
   appName: 'ORNEX',
-  primaryColor: '#A020F0',
-  accentColor: '#C084FC',
+  primaryColor: '#000000',
+  accentColor: '#D61E2B',
   logoIcon: 'play',
   showTabs: ['foryou', 'explore', 'post', 'inbox', 'me'],
 };
 
-const BRAND_COLORS = new Set(['#000000', '#111111', '#A020F0', '#8A2BE2', '#C084FC', '#FFFFFF']);
+const BRAND_COLORS = new Set(['#000000', '#111111', '#D61E2B', '#FFFFFF']);
 let cachedConfig: AppConfig | null = null;
 
 function normalizeConfig(value: Record<string, unknown>): AppConfig {

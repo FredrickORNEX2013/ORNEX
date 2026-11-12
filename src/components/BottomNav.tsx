@@ -8,12 +8,12 @@ const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
 
 export default function BottomNav({ active, onChange, visibleTabs }: BottomNavProps) {
   const tabs = visibleTabs ? TABS.filter((tab) => visibleTabs.includes(tab.key)) : TABS;
-  return <nav aria-label="Main navigation" className="ornex-bottom-nav fixed bottom-0 left-0 right-0 z-[99999] flex items-center justify-around border-t border-[#A020F0]/30 bg-black bottom-nav-safe" style={{ height: '70px' }}>
+  return <nav aria-label="Main navigation" className="ornex-bottom-nav fixed bottom-0 left-0 right-0 z-[99999] flex items-center justify-around border-t border-white/10 bg-black bottom-nav-safe px-1 pb-1 pt-2">
     {tabs.map(({ key, label, icon: Icon }) => {
       const isActive = active === key;
       return <button key={key} onClick={() => onChange(key)} aria-current={isActive ? 'page' : undefined} className="ornex-nav-item flex flex-col items-center gap-0.5 active:scale-95">
-        <span className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${isActive ? 'ornex-nav-active' : ''} ${key === 'post' ? 'ornex-nav-post' : ''}`}><Icon className={`h-5 w-5 transition-colors ${isActive ? 'text-[#C084FC]' : 'text-white/60'}`} strokeWidth={isActive ? 2.6 : 2} /></span>
-        <span className={`text-[10px] font-medium transition-colors ${isActive ? 'text-[#C084FC]' : 'text-white/60'}`}>{label}</span>
+        <span className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${isActive ? 'ornex-nav-active' : ''} ${key === 'post' ? 'ornex-nav-post' : ''}`}><Icon className={`h-5 w-5 ${key === 'post' ? 'h-5 w-5' : ''}`} /></span>
+        <span className={`text-[10px] font-medium transition-colors ${isActive ? 'text-[#D61E2B]' : 'text-white/60'}`}>{label}</span>
       </button>;
     })}
   </nav>;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, MessageCircle, MoreVertical, Plus, Send, Share2, X } from 'lucide-react';
-import { useLikeToggle, useProfiles, useVideos } from '@/lib/hooks';
+import { useComments, useLikeToggle, useProfiles, useVideos } from '@/lib/hooks';
 import { type VideoRecord, supabase } from '@/lib/supabase';
 import { getCurrentUserId } from '@/lib/user';
 import OrnexLogo from '@/components/OrnexLogo';
@@ -22,7 +22,7 @@ export default function ForYouTab({ onPostClick }: { onPostClick: () => void }) 
       <p className="mt-2 text-sm text-white/70">For You only shows videos with a duration of 60 seconds or less.</p>
       <button onClick={onPostClick} className="mt-5 flex items-center gap-2 bg-[#D61E2B] px-5 py-3 font-bold"><Plus className="h-5 w-5"/>Upload a video</button>
       {loading && <p className="mt-4 text-sm text-white/60">Loading videos…</p>}
-    </section> : shorts.map((video) => <ShortSlide key={video.id} video={video} onPostClick={onPostClick}/>)}
+    </section> : shorts.map((video) => <ShortSlide key={video.id} video={video} onPostClick={onPostClick}/>) }
   </div>;
 }
 
@@ -97,7 +97,7 @@ function ShortSlide({ video, onPostClick }: { video: VideoRecord; onPostClick: (
 }
 
 function CommentsSheet({ video, userId, onClose }: { video: VideoRecord; userId: string; onClose: () => void }) {
-  const { comments, loading, addComment } = useCommentsForVideo(video.id);
+  const { comments, loading, addComment } = useComments(video.id);
   const [text, setText] = useState('');
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -113,9 +113,4 @@ function CommentsSheet({ video, userId, onClose }: { video: VideoRecord; userId:
       <form onSubmit={(event) => void submit(event)} className="flex gap-2 border-t border-white/15 p-3"><input value={text} onChange={(event) => setText(event.target.value)} placeholder={userId ? 'Add a comment…' : 'Sign in to comment'} disabled={!userId} className="min-w-0 flex-1 border border-white/25 bg-black px-3 py-2 text-sm text-white placeholder:text-white/50"/><button type="submit" disabled={!userId || !text.trim()} aria-label="Send comment" className="bg-[#D61E2B] px-3 text-white disabled:opacity-50"><Send className="h-4 w-4"/></button></form>
     </section>
   </div>;
-}
-
-function useCommentsForVideo(videoId: string) {
-  // Keep the comments hook encapsulated so the sheet loads and refreshes its own thread.
-  return useComments(videoId);
 }

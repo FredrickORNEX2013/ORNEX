@@ -15,8 +15,8 @@ import {
   AlertCircle,
   Zap,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';import 
-  import { getCurrentUserId } from '@/lib/user';
+import { supabase } from '@/lib/supabase';
+import { getCurrentUserId } from '@/lib/user';
 import { invalidateVideoCache } from '@/lib/hooks';
 
 type Mode = 'choose' | 'camera' | 'edit' | 'details';

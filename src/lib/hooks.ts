@@ -92,13 +92,13 @@ export function useProfiles(userIds: string[]) {
     if (userIds.length === 0) return;
     const uniqueIds = [...new Set(userIds.filter(Boolean))];
     const uncached = uniqueIds.filter((id) => !profileCache[id]);
-    if (uncached.length === 0) { setProfiles((prev) => ({ ...prev, ...Object.fromEntries(uniqueIds.map((id) => [id, profileCache[id]])) }))); return; }
+    if (uncached.length === 0) { setProfiles((prev) => ({ ...prev, ...Object.fromEntries(uniqueIds.map((id) => [id, profileCache[id]])) })); return; }
     (async () => {
       const { data } = await supabase.from('profiles').select('*').in('id', uncached);
       if (data) {
         const map: Record<string, ProfileRecord> = {};
         data.forEach((p) => { map[p.id] = p as ProfileRecord; profileCache[p.id] = p as ProfileRecord; });
-        setProfiles((prev) => ({ ...prev, ...map, ...Object.fromEntries(uniqueIds.map((id) => [id, profileCache[id]])) })));
+        setProfiles((prev) => ({ ...prev, ...map, ...Object.fromEntries(uniqueIds.map((id) => [id, profileCache[id]])) }));
       }
     })();
   }, [userIds.join(',')]);

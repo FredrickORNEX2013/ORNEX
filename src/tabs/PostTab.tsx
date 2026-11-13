@@ -1,37 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Upload } from 'lucide-react';
+import { Camera, Check, Images, Upload, X } from 'lucide-react';
 import { supabase, type VideoRecord } from '@/lib/supabase';
 import { publishVideo } from '@/lib/hooks';
 import { getCurrentUserId } from '@/lib/user';
 
 const CATEGORIES = ['Comedy', 'Drama', 'Entertainment'] as const;
 type PostTabProps = { onPosted: (isShort: boolean) => void };
-type ExternalVideo = { platform: 'youtube' | 'vimeo'; id: string; url: string };
-
-function parseExternalVideo(value: string): ExternalVideo | null {
-  try {
-    const url = new URL(value.trim());
-    const host = url.hostname.toLowerCase().replace(/^www\./, '');
-    if (host === 'youtu.be') {
-      const id = url.pathname.slice(1).split('/')[0];
-      return /^[\w-]{11}$/.test(id) ? { platform: 'youtube', id, url: `https://www.youtube.com/watch?v=${id}` } : null;
-    }
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      const id = url.searchParams.get('v') || url.pathname.match(/^\/(?:shorts|embed)\/([\w-]{11})/)?.[1];
-      return id && /^[\w-]{11}$/.test(id) ? { platform: 'youtube', id, url: `https://www.youtube.com/watch?v=${id}` } : null;
-    }
-    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
-      const id = url.pathname.match(/\/(?:video\/)?(\d+)/)?.[1];
-      return id ? { platform: 'vimeo', id, url: `https://vimeo.com/${id}` } : null;
-    }
-  } catch { return null; }
-  return null;
-}
+type PickerMode = 'upload' | 'record' | 'gallery';
 
 export default function PostTab({ onPosted }: PostTabProps) {
   const [video, setVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
-  const [externalUrl, setExternalUrl] = useState('');
   const [duration, setDuration] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
@@ -39,31 +18,43 @@ export default function PostTab({ onPosted }: PostTabProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
-  const videoInput = useRef<HTMLInputElement>(null);
+  const uploadInput = useRef<HTMLInputElement>(null);
+  const recordInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
+
   const chooseVideo = (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith('video/')) { setError('Choose a video file.'); return; }
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
     setVideo(file);
-    setExternalUrl('');
     setDuration(null);
     setVideoUrl(URL.createObjectURL(file));
+    setTitle(file.name.replace(/\.[^.]+$/, '').slice(0, 100));
     setError('');
     setDone(false);
   };
-  const setLink = (value: string) => {
-    setExternalUrl(value);
+
+  const clearVideo = () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
     setVideo(null);
     setVideoUrl('');
     setDuration(null);
-    setError(value.trim() && !parseExternalVideo(value) ? 'Paste a valid YouTube or Vimeo video URL.' : '');
-    setDone(false);
+    setTitle('');
+    if (uploadInput.current) uploadInput.current.value = '';
+    if (recordInput.current) recordInput.current.value = '';
+    if (galleryInput.current) galleryInput.current.value = '';
   };
-  const upload = async () => {
-    const external = parseExternalVideo(externalUrl);
-    if (!video && !external) { setError('Choose a video file or paste a valid YouTube/Vimeo link.'); return; }
-    if (video && (!duration || !Number.isFinite(duration))) { setError('Wait for the video preview to finish loading before posting.'); return; }
+
+  const openPicker = (mode: PickerMode) => {
+    const picker = mode === 'record' ? recordInput : mode === 'gallery' ? galleryInput : uploadInput;
+    picker.current?.click();
+  };
+
+  const postVideo = async () => {
+    if (!video) { setError('Choose or record a video first.'); return; }
+    if (!duration || !Number.isFinite(duration)) { setError('Wait for the video preview to finish loading before posting.'); return; }
     if (!title.trim()) { setError('Enter a title.'); return; }
     const userId = await getCurrentUserId();
     if (!userId) { setError('Sign in before posting.'); return; }
@@ -71,18 +62,11 @@ export default function PostTab({ onPosted }: PostTabProps) {
     setBusy(true);
     setError('');
     try {
-      let storagePath: string;
-      let publicVideoUrl: string;
-      if (external) {
-        storagePath = `${external.platform}/${external.id}`;
-        publicVideoUrl = external.url;
-      } else {
-        const safeName = video!.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        storagePath = `uploads/${userId}/${Date.now()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage.from('videos').upload(storagePath, video!, { contentType: video!.type || 'video/mp4' });
-        if (uploadError) throw uploadError;
-        publicVideoUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl;
-      }
+      const safeName = video.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `uploads/${userId}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from('videos').upload(storagePath, video, { contentType: video.type || 'video/mp4' });
+      if (uploadError) throw uploadError;
+      const publicVideoUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl;
       const row = {
         user_id: userId,
         title: title.trim(),
@@ -93,37 +77,60 @@ export default function PostTab({ onPosted }: PostTabProps) {
         orientation: 'portrait' as const,
         likes: 0,
         views: 0,
-        duration_seconds: external ? 60 : Math.ceil(duration!),
+        duration_seconds: Math.ceil(duration),
         type: 'SHORT',
         is_live: false,
         status: 'approved',
-        vimeo_url: external?.platform === 'vimeo' ? external.url : null,
-        youtube_url: external?.platform === 'youtube' ? external.url : null,
       };
       const { data, error: insertError } = await supabase.from('videos').insert(row).select('*').single();
       if (insertError) throw insertError;
       publishVideo(data as VideoRecord);
       setDone(true);
-      setVideo(null); setVideoUrl(''); setDuration(null); setTitle(''); setCaption(''); setExternalUrl('');
-      if (videoInput.current) videoInput.current.value = '';
+      clearVideo();
+      setCaption('');
       onPosted(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not publish your video.');
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
-  return <div className="h-full overflow-y-auto bg-black px-4 pb-24 pt-5 text-white">
-    <h1 className="mb-1 text-2xl font-bold">Create a post</h1><p className="mb-5 text-sm text-white/60">Share a video with ORNEX.</p>
-    {done && <p role="status" className="mb-4 flex items-center gap-2 text-sm"><Check className="h-4 w-4 text-[#D61E2B]"/>Post published and added to your videos.</p>}
-    <label htmlFor="external-video-url" className="mb-2 block text-sm font-semibold">YouTube or Vimeo link</label>
-    <input id="external-video-url" value={externalUrl} onChange={(event) => setLink(event.target.value)} placeholder="https://youtube.com/shorts/… or https://vimeo.com/…" className="mb-4 w-full rounded-lg border border-white/25 bg-black p-3 text-sm outline-none focus:border-[#D61E2B]"/>
-    <div className="mb-4 flex items-center gap-3 text-xs text-white/45"><span className="h-px flex-1 bg-white/15"/>OR<span className="h-px flex-1 bg-white/15"/></div>
-    <input ref={videoInput} type="file" accept="video/*" className="hidden" onChange={(event) => chooseVideo(event.target.files?.[0])}/>
-    {!video ? <button type="button" onClick={() => videoInput.current?.click()} className="mb-5 flex w-full items-center gap-4 rounded-xl border border-white/20 p-5 text-left"><Upload className="h-8 w-8 text-[#D61E2B]"/><span><span className="block font-semibold">Upload from your phone</span><span className="mt-1 block text-xs text-white/55">Select a video from your device.</span></span></button> : <div className="mb-5">{videoUrl && <video src={videoUrl} controls playsInline onLoadedMetadata={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : null)} className="mb-3 max-h-64 w-full rounded-lg bg-neutral-900"/>}<button type="button" onClick={() => videoInput.current?.click()} className="text-sm underline">Choose a different video</button></div>}
-    <label htmlFor="post-title" className="mb-1 block text-sm font-semibold">Title</label><input id="post-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={100} placeholder="Add a title" className="mb-4 w-full rounded-lg border border-white/25 bg-black p-3 text-sm outline-none focus:border-[#D61E2B]"/>
-    <label htmlFor="post-category" className="mb-1 block text-sm font-semibold">Category</label><select id="post-category" value={category} onChange={(event) => setCategory(event.target.value as (typeof CATEGORIES)[number])} className="mb-4 w-full rounded-lg border border-white/25 bg-black p-3 text-sm"><option value="Comedy">Comedy</option><option value="Drama">Drama</option><option value="Entertainment">Entertainment</option></select>
-    <label htmlFor="post-description" className="mb-1 block text-sm font-semibold">Description</label><textarea id="post-description" value={caption} onChange={(event) => setCaption(event.target.value)} maxLength={500} rows={4} placeholder="Tell people about your video" className="mb-4 w-full resize-none rounded-lg border border-white/25 bg-black p-3 text-sm outline-none focus:border-[#D61E2B]"/>
-    {error && <p role="alert" className="mb-3 text-sm text-red-400">{error}</p>}
-    <button type="button" disabled={busy} onClick={() => void upload()} className="w-full rounded-lg bg-[#D61E2B] py-3 font-bold disabled:opacity-60">{busy ? 'Publishing…' : 'Publish post'}</button>
+  const actions: { mode: PickerMode; title: string; description: string; icon: typeof Upload }[] = [
+    { mode: 'upload', title: 'Upload', description: 'Choose a video from gallery or files', icon: Upload },
+    { mode: 'record', title: 'Record', description: 'Record with camera, add filters & sound', icon: Camera },
+    { mode: 'gallery', title: 'Gallery', description: 'Browse your video collection', icon: Images },
+  ];
+
+  return <div className="h-full overflow-y-auto bg-black px-4 pb-24 pt-6 text-white">
+    <h1 className="mb-6 text-4xl font-extrabold tracking-tight">Create</h1>
+
+    <div className="space-y-3">
+      {actions.map(({ mode, title: actionTitle, description, icon: Icon }) => (
+        <button key={mode} type="button" onClick={() => openPicker(mode)} className="flex min-h-[104px] w-full items-center gap-5 rounded-2xl border border-white/15 bg-[#111] p-5 text-left transition-colors hover:border-[#D61E2B]/70 hover:bg-[#181818] active:scale-[.99]">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#D61E2B]/10"><Icon aria-hidden="true" className="h-7 w-7 text-[#D61E2B]" strokeWidth={2.2}/></span>
+          <span><span className="block text-lg font-bold">{actionTitle}</span><span className="mt-1 block text-sm leading-5 text-white/60">{description}</span></span>
+        </button>
+      ))}
+    </div>
+
+    <input ref={uploadInput} type="file" accept="video/*" className="hidden" onChange={(event) => chooseVideo(event.target.files?.[0])}/>
+    <input ref={recordInput} type="file" accept="video/*" capture="environment" className="hidden" onChange={(event) => chooseVideo(event.target.files?.[0])}/>
+    <input ref={galleryInput} type="file" accept="video/*" className="hidden" onChange={(event) => chooseVideo(event.target.files?.[0])}/>
+
+    {done && <p role="status" className="mt-5 flex items-center gap-2 text-sm"><Check className="h-4 w-4 text-[#D61E2B]"/>Post published and added to your videos.</p>}
+    {video && <section aria-label="Prepare your video post" className="mt-6 rounded-2xl border border-white/15 bg-[#111] p-4">
+      <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold">Your video</h2><button type="button" aria-label="Remove selected video" onClick={clearVideo} className="rounded-full p-2 text-white/70 hover:bg-white/10"><X className="h-5 w-5"/></button></div>
+      {videoUrl && <video src={videoUrl} controls playsInline onLoadedMetadata={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : null)} className="mb-4 max-h-64 w-full rounded-lg bg-neutral-900"/>}
+      <label htmlFor="post-title" className="mb-1 block text-sm font-semibold">Title</label>
+      <input id="post-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={100} placeholder="Add a title" className="mb-4 w-full rounded-lg border border-white/20 bg-black p-3 text-sm outline-none focus:border-[#D61E2B]"/>
+      <label htmlFor="post-category" className="mb-1 block text-sm font-semibold">Category</label>
+      <select id="post-category" value={category} onChange={(event) => setCategory(event.target.value as (typeof CATEGORIES)[number])} className="mb-4 w-full rounded-lg border border-white/20 bg-black p-3 text-sm"><option value="Comedy">Comedy</option><option value="Drama">Drama</option><option value="Entertainment">Entertainment</option></select>
+      <label htmlFor="post-caption" className="mb-1 block text-sm font-semibold">Caption</label>
+      <textarea id="post-caption" value={caption} onChange={(event) => setCaption(event.target.value)} maxLength={500} rows={3} placeholder="Tell people about your video" className="mb-4 w-full resize-none rounded-lg border border-white/20 bg-black p-3 text-sm outline-none focus:border-[#D61E2B]"/>
+      {error && <p role="alert" className="mb-3 text-sm text-red-400">{error}</p>}
+      <button type="button" disabled={busy} onClick={() => void postVideo()} className="w-full rounded-lg bg-[#D61E2B] py-3 font-bold disabled:opacity-60">{busy ? 'Publishing…' : 'Post video'}</button>
+    </section>}
+    {!video && error && <p role="alert" className="mt-4 text-sm text-red-400">{error}</p>}
   </div>;
 }

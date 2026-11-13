@@ -65,7 +65,7 @@ export default function App() {
       <main className="min-h-0 flex-1 overflow-hidden bg-black">
         {activeTab === 'foryou' && <ForYouTab onPostClick={() => setActiveTab('post')} />}
         {activeTab === 'explore' && <ExploreTab />}
-        {activeTab === 'post' && <PostTab />}
+        {activeTab === 'post' && <PostTab onPosted={(isShort) => setActiveTab(isShort ? 'foryou' : 'explore')} />}
         {activeTab === 'inbox' && <InboxTab />}
         {activeTab === 'me' && <MeTab />}
       </main>

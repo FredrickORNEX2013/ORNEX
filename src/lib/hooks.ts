@@ -30,6 +30,12 @@ async function fetchVideos(): Promise<VideoRecord[]> {
   return (data || []) as VideoRecord[];
 }
 
+export function publishVideo(video: VideoRecord) {
+  const current = videosCache || [];
+  videosCache = [video, ...current.filter((item) => item.id !== video.id)].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  videosListeners.forEach((listener) => listener(videosCache));
+}
+
 export function invalidateVideoCache() {
   videosCache = null;
   videosListeners.forEach((listener) => listener(null));

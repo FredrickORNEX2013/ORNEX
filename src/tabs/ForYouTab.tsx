@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, MoreVertical, Plus, Play, Send, Share2, X } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Plus, Send, Share2, X } from 'lucide-react';
 import { useComments, useLikeToggle, useProfiles, useVideos } from '@/lib/hooks';
 import { type VideoRecord, supabase } from '@/lib/supabase';
 import { getCurrentUserId } from '@/lib/user';
 import OrnexLogo from '@/components/OrnexLogo';
-import DemoVideoSeeder from '@/components/DemoVideoSeeder';
 
 function isShort(video: VideoRecord) {
-  return video.is_live !== true && video.type?.toUpperCase() !== 'LONG' &&
-    typeof video.duration_seconds === 'number' && video.duration_seconds <= 60;
+  return video.is_live !== true && typeof video.duration_seconds === 'number' && video.duration_seconds <= 60;
 }
 
 export default function ForYouTab({ onPostClick }: { onPostClick: () => void }) {
   const { videos, loading } = useVideos();
-  const shorts = useMemo(() => videos.filter(isShort), [videos]);
+  const shorts = useMemo(() => videos.filter(isShort).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)), [videos]);
   const feedRef = useRef<HTMLDivElement>(null);
 
   return <div ref={feedRef} aria-label="For You short videos" className="relative h-full snap-y snap-mandatory overflow-y-auto bg-black text-white [scrollbar-width:none]">
     <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-12 items-center justify-center bg-black/35"><OrnexLogo size={23}/></div>
-    <DemoVideoSeeder/>
     {shorts.length === 0 ? <section className="flex h-full snap-start flex-col items-center justify-center px-8 text-center">
       <OrnexLogo size={28}/><p className="mt-5 text-xl font-bold">No short videos yet</p>
-      <p className="mt-2 text-sm text-white/70">For You only shows videos with a duration of 60 seconds or less.</p>
-      <button onClick={onPostClick} className="mt-5 flex items-center gap-2 bg-[#D61E2B] px-5 py-3 font-bold"><Plus className="h-5 w-5"/>Upload a video</button>
+      <p className="mt-2 text-sm text-white/70">Be the first to share a short video.</p>
+      <button onClick={onPostClick} className="mt-5 flex items-center gap-2 bg-[#D61E2B] px-5 py-3 font-bold"><Plus className="h-5 w-5"/>Post first</button>
       {loading && <p className="mt-4 text-sm text-white/60">Loading videos…</p>}
     </section> : shorts.map((video) => <ShortSlide key={video.id} video={video} onPostClick={onPostClick}/>) }
   </div>;
@@ -40,6 +37,7 @@ function ShortSlide({ video, onPostClick }: { video: VideoRecord; onPostClick: (
   const { liked, likeCount, toggleLike } = useLikeToggle(video.id, video.likes || 0, userId);
   const username = profile?.username || video.username || 'ornex';
   const displayName = profile?.display_name || video.display_name || username;
+  const vimeoId = getVimeoId(video.vimeo_url);
 
   useEffect(() => { void getCurrentUserId().then((id) => setUserId(id || '')); }, []);
   useEffect(() => {
@@ -67,9 +65,9 @@ function ShortSlide({ video, onPostClick }: { video: VideoRecord; onPostClick: (
   };
 
   return <article className="relative h-full min-h-full snap-start snap-always overflow-hidden bg-black">
-    <video src={video.url} poster={video.thumbnail_url || undefined} autoPlay muted loop playsInline
+    {vimeoId ? <iframe src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1&muted=1&loop=1`} title={video.title || 'Vimeo video'} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen className="absolute inset-0 h-full w-full border-0" /> : <video src={video.url} poster={video.thumbnail_url || undefined} autoPlay muted loop playsInline
       onTimeUpdate={(event) => { const el = event.currentTarget; setProgress(el.duration ? (el.currentTime / el.duration) * 100 : 0); }}
-      className="absolute inset-0 h-full w-full object-cover" aria-label={video.title || 'Short video'} />
+      className="absolute inset-0 h-full w-full object-cover" aria-label={video.title || 'Short video'} />}
     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-black via-black/55 to-transparent"/>
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between px-4 pb-8 pr-[5.2rem]">
       <div className="min-w-0">
@@ -92,10 +90,16 @@ function ShortSlide({ video, onPostClick }: { video: VideoRecord; onPostClick: (
       <button onClick={() => setMoreOpen((open) => !open)} aria-label="More video options" className="text-white"><MoreVertical className="h-7 w-7"/></button>
       {moreOpen && <div className="absolute bottom-0 right-10 w-36 border border-white/30 bg-black p-2 text-xs"><button onClick={() => { setMoreOpen(false); window.alert('Thanks. This video has been reported.'); }}>Report video</button></div>}
     </div>
-    <div className="absolute inset-x-0 bottom-0 z-30 h-[2px] bg-white/20"><div className="h-full bg-[#D61E2B]" style={{ width: `${progress}%` }}/></div>
+    {!vimeoId && <div className="absolute inset-x-0 bottom-0 z-30 h-[2px] bg-white/20"><div className="h-full bg-[#D61E2B]" style={{ width: `${progress}%` }}/></div>}
     {commentsOpen && <CommentsSheet video={video} userId={userId} onClose={() => setCommentsOpen(false)}/>}
     <button onClick={onPostClick} aria-label="Upload a video" className="absolute right-3 top-14 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-black/40 text-white"><Plus className="h-5 w-5"/></button>
   </article>;
+}
+
+function getVimeoId(value?: string | null) {
+  if (!value) return null;
+  const match = value.match(/(?:vimeo\.com\/(?:video\/)?)(\d+)/i);
+  return match?.[1] || null;
 }
 
 function CommentsSheet({ video, userId, onClose }: { video: VideoRecord; userId: string; onClose: () => void }) {

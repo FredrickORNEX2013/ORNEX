@@ -24,6 +24,7 @@ export type VideoRecord = {
   is_live?: boolean;
   is_channel?: boolean;
   thumbnail_url?: string | null;
+  vimeo_url?: string | null;
   username?: string | null;
   display_name?: string | null;
   avatar_url?: string | null;

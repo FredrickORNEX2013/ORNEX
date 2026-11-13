@@ -11,31 +11,22 @@ export type ProfileRecord = AppProfile & {
 
 type ProfileListener = (profile: ProfileRecord) => void;
 const profileListeners = new Set<ProfileListener>();
-
-export function notifyProfileUpdated(profile: ProfileRecord) {
-  profileListeners.forEach((listener) => listener(profile));
-}
+export function notifyProfileUpdated(profile: ProfileRecord) { profileListeners.forEach((listener) => listener(profile)); }
 
 type VideosListener = (videos: VideoRecord[] | null) => void;
 let videosCache: VideoRecord[] | null = null;
 const videosListeners = new Set<VideosListener>();
-
 async function fetchVideos(): Promise<VideoRecord[]> {
   const { data, error } = await supabase.from('videos').select('*').eq('status', 'approved').order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []) as VideoRecord[];
 }
-
 export function publishVideo(video: VideoRecord) {
-  const current = videosCache || [];
-  videosCache = [video, ...current.filter((item) => item.id !== video.id)].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  if (videosCache === null) { videosListeners.forEach((listener) => listener(null)); return; }
+  videosCache = [video, ...videosCache.filter((item) => item.id !== video.id)].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   videosListeners.forEach((listener) => listener(videosCache));
 }
-
-export function invalidateVideoCache() {
-  videosCache = null;
-  videosListeners.forEach((listener) => listener(null));
-}
+export function invalidateVideoCache() { videosCache = null; videosListeners.forEach((listener) => listener(null)); }
 
 export function useVideos() {
   const [videos, setVideos] = useState<VideoRecord[]>(videosCache || []);
@@ -45,13 +36,10 @@ export function useVideos() {
     setLoading(true);
     try {
       const result = await fetchVideos();
-      videosCache = result;
-      setVideos(result);
-      setError(null);
+      videosCache = result; setVideos(result); setError(null);
       videosListeners.forEach((listener) => listener(result));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not load videos.');
-    } finally { setLoading(false); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load videos.'); }
+    finally { setLoading(false); }
   }, []);
   useEffect(() => {
     const listener: VideosListener = (result) => { if (result === null) void load(); else { setVideos(result); setLoading(false); } };
@@ -135,9 +123,7 @@ export function useLikeToggle(videoId: string, initialCount = 0, userId = '') {
   const busyRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
-    likedRef.current = false;
-    setLiked(false);
-    setLikeCount(initialCount);
+    likedRef.current = false; setLiked(false); setLikeCount(initialCount);
     if (!videoId) return () => { cancelled = true; };
     void (async () => {
       const [countResult, likeResult] = await Promise.all([
@@ -146,27 +132,17 @@ export function useLikeToggle(videoId: string, initialCount = 0, userId = '') {
       ]);
       if (cancelled) return;
       if (!countResult.error && countResult.count !== null) setLikeCount(countResult.count);
-      const isLiked = !!likeResult.data;
-      likedRef.current = isLiked;
-      setLiked(isLiked);
+      const isLiked = !!likeResult.data; likedRef.current = isLiked; setLiked(isLiked);
     })();
     return () => { cancelled = true; };
   }, [videoId, userId, initialCount]);
   const toggleLike = useCallback(async () => {
     if (!videoId || !userId || busyRef.current) return;
     busyRef.current = true;
-    const wasLiked = likedRef.current;
-    likedRef.current = !wasLiked;
-    setLiked(!wasLiked);
+    const wasLiked = likedRef.current; likedRef.current = !wasLiked; setLiked(!wasLiked);
     setLikeCount((count) => Math.max(0, count + (wasLiked ? -1 : 1)));
-    const result = wasLiked
-      ? await supabase.from('likes').delete().eq('video_id', videoId).eq('user_id', userId)
-      : await supabase.from('likes').insert({ video_id: videoId, user_id: userId });
-    if (result.error) {
-      likedRef.current = wasLiked;
-      setLiked(wasLiked);
-      setLikeCount((count) => Math.max(0, count + (wasLiked ? 1 : -1)));
-    }
+    const result = wasLiked ? await supabase.from('likes').delete().eq('video_id', videoId).eq('user_id', userId) : await supabase.from('likes').insert({ video_id: videoId, user_id: userId });
+    if (result.error) { likedRef.current = wasLiked; setLiked(wasLiked); setLikeCount((count) => Math.max(0, count + (wasLiked ? 1 : -1))); }
     busyRef.current = false;
   }, [videoId, userId]);
   return { liked, likeCount, toggleLike };

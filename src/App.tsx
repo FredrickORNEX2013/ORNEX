@@ -4,7 +4,6 @@ import BottomNav, { type TabKey } from '@/components/BottomNav';
 import ForYouTab from '@/tabs/ForYouTab';
 import ExploreTab from '@/tabs/ExploreTab';
 import PostTab from '@/tabs/PostTab';
-import LiveTab from '@/tabs/LiveTab';
 import InboxTab from '@/tabs/InboxTab';
 import MeTab from '@/tabs/MeTab';
 import AdminPanel from '@/components/AdminPanel';
@@ -52,30 +51,26 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const finishSplash = useCallback(() => { setLoading(false); setShowSplash(false); }, []);
   useBoltKill();
+
   useEffect(() => {
     const fallbackTimer = window.setTimeout(() => { setLoading(false); setShowSplash(false); }, 2500);
     return () => window.clearTimeout(fallbackTimer);
   }, []);
-  useEffect(() => {
-    if (config.showTabs?.length && !config.showTabs.includes(activeTab) && activeTab !== 'live') setActiveTab(config.showTabs[0] as TabKey);
-  }, [config.showTabs, activeTab]);
-  if (hash === '#/admin' || hash === '#admin') return <AdminPanel/>;
-  const renderTab = () => {
-    switch (activeTab) {
-      case 'foryou': return <ForYouTab onPostClick={() => setActiveTab('post')}/>;
-      case 'explore': return <ExploreTab/>;
-      case 'post': return <PostTab/>;
-      case 'live': return <LiveTab/>;
-      case 'inbox': return <InboxTab/>;
-      case 'me': return <MeTab/>;
-      default: return <ForYouTab onPostClick={() => setActiveTab('post')}/>;
-    }
-  };
-  const isForYou = activeTab === 'foryou';
-  return <div aria-busy={loading} className="flex h-[100dvh] flex-col bg-black text-white">
-    {!isForYou && <Header appName={config.appName}/>}
-    <main className="min-h-0 flex-1 overflow-hidden bg-black"><div key={activeTab} className="h-full w-full transition-none">{renderTab()}</div></main>
-    <BottomNav active={activeTab} onChange={setActiveTab} visibleTabs={config.showTabs}/>
-    {showSplash && <Splash onDone={finishSplash}/>}
-  </div>;
+
+  if (hash === '#/admin' || hash === '#admin') return <AdminPanel />;
+
+  return (
+    <div aria-busy={loading} className="flex h-[100dvh] flex-col bg-black text-white">
+      {activeTab !== 'foryou' && <Header appName={config.appName} />}
+      <main className="min-h-0 flex-1 overflow-hidden bg-black">
+        {activeTab === 'foryou' && <ForYouTab onPostClick={() => setActiveTab('post')} />}
+        {activeTab === 'explore' && <ExploreTab />}
+        {activeTab === 'post' && <PostTab />}
+        {activeTab === 'inbox' && <InboxTab />}
+        {activeTab === 'me' && <MeTab />}
+      </main>
+      <BottomNav active={activeTab} onChange={setActiveTab} />
+      {showSplash && <Splash onDone={finishSplash} />}
+    </div>
+  );
 }

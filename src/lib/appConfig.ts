@@ -9,15 +9,16 @@ export type AppConfig = {
   showTabs: string[];
 };
 
+const MAIN_TABS = ['foryou', 'explore', 'post', 'inbox', 'me'];
 const DEFAULT_CONFIG: AppConfig = {
   appName: 'ORNEX',
   primaryColor: '#000000',
   accentColor: '#D61E2B',
   logoIcon: 'play',
-  showTabs: ['foryou', 'explore', 'post', 'inbox', 'me'],
+  showTabs: MAIN_TABS,
 };
 
-const BRAND_COLORS = new Set(['#000000', '#111111', '#D61E2B', '#FFFFFF']);
+const BRAND_COLORS = new Set(['#000000', '#FFFFFF', '#D61E2B']);
 let cachedConfig: AppConfig | null = null;
 
 function normalizeConfig(value: Record<string, unknown>): AppConfig {
@@ -27,6 +28,7 @@ function normalizeConfig(value: Record<string, unknown>): AppConfig {
     primaryColor: BRAND_COLORS.has(parsed.primaryColor?.toUpperCase()) ? parsed.primaryColor : DEFAULT_CONFIG.primaryColor,
     accentColor: BRAND_COLORS.has(parsed.accentColor?.toUpperCase()) ? parsed.accentColor : DEFAULT_CONFIG.accentColor,
     appName: 'ORNEX',
+    showTabs: MAIN_TABS,
   };
 }
 
@@ -53,7 +55,6 @@ export function useAppConfig() {
           if (!cancelled) setConfig(cachedConfig);
         }
       } catch {
-        // Keep the local defaults so a missing or unavailable Supabase never blocks startup.
         if (!cancelled) setConfig(cachedConfig || DEFAULT_CONFIG);
       }
     };

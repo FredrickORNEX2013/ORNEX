@@ -1,110 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Bell, MessageCircle, Search, Users } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Search, Users, Bell, Heart, MessageCircle, UserPlus } from 'lucide-react';
 import { supabase, type AppProfile } from '@/lib/supabase';
 import { getCurrentUserId } from '@/lib/user';
 import Avatar from '@/components/Avatar';
-
-type InboxNotification = { id: string; recipient_id: string; actor_id: string; kind: string; video_id: string | null; created_at: string; read_at?: string | null };
-type Follow = { follower_id: string; following_id: string; created_at?: string };
-type InboxTabKey = 'Friends' | 'Activities' | 'Following' | 'Followers' | 'Requests';
-const TABS: InboxTabKey[] = ['Friends', 'Activities', 'Following', 'Followers', 'Requests'];
-
-export default function InboxTab() {
-  const [tab, setTab] = useState<InboxTabKey>('Friends');
-  const [userId, setUserId] = useState('');
-  const [unread, setUnread] = useState(0);
-  useEffect(() => { void getCurrentUserId().then((id) => setUserId(id || '')); }, []);
-  const loadUnread = useCallback(async () => {
-    if (!userId) return;
-    const { count, error } = await supabase.from('social_notifications').select('id', { count: 'exact', head: true }).eq('recipient_id', userId).is('read_at', null);
-    if (error) { console.error('Could not load inbox unread count:', error.message); return; }
-    setUnread(count || 0);
-  }, [userId]);
-  useEffect(() => {
-    void loadUnread();
-    if (!userId) return;
-    const channel = supabase.channel(`inbox-unread-${userId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'social_notifications', filter: `recipient_id=eq.${userId}` }, () => { void loadUnread(); }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [loadUnread, userId]);
-  return <div className="flex h-full flex-col bg-black text-white">
-    <div className="flex shrink-0 items-center gap-3 px-4 py-3"><button type="button" className="rounded-full border border-white/20 px-4 py-2 text-sm font-bold">Inbox</button>{unread > 0 && <span className="rounded-full bg-[#D61E2B] px-3 py-1 text-xs font-bold">{unread} New</span>}</div>
-    <div role="tablist" aria-label="Inbox" className="flex shrink-0 gap-5 overflow-x-auto border-b border-white/15 px-4 [scrollbar-width:none]">{TABS.map((key) => <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`shrink-0 border-b-2 py-3 text-sm font-semibold ${tab === key ? 'border-[#D61E2B] text-white' : 'border-transparent text-white/55'}`}>{key}</button>)}</div>
-    <div className="min-h-0 flex-1 overflow-y-auto">{!userId ? <EmptyState text="Sign in to see your inbox."/> : tab === 'Activities' ? <Activities userId={userId} onUnreadChange={loadUnread}/> : <People userId={userId} mode={tab}/>}</div>
-  </div>;
+type InboxTabKey='Friends'|'Activities'|'Following'|'Followers'|'Requests';
+const TABS:InboxTabKey[]=['Friends','Activities','Following','Followers','Requests'];
+type Notification={id:string;actor_id:string;kind:string;created_at:string;read_at?:string|null};
+export default function InboxTab(){
+ const [tab,setTab]=useState<InboxTabKey>('Friends');const [userId,setUserId]=useState('');const [unread,setUnread]=useState(0);const [searchOpen,setSearchOpen]=useState(false);
+ useEffect(()=>{void getCurrentUserId().then(setUserId);},[]);
+ const loadUnread=useCallback(async()=>{if(!userId)return;const {count}=await supabase.from('social_notifications').select('id',{count:'exact',head:true}).eq('recipient_id',userId).is('read_at',null);setUnread(count||0);},[userId]);
+ useEffect(()=>{void loadUnread();},[loadUnread]);
+ return <div className="flex h-full flex-col bg-black text-white"><div className="flex shrink-0 items-center gap-3 px-4 py-3"><span className="rounded-full bg-black px-4 py-2 text-sm font-bold ring-1 ring-white/30">Inbox</span>{unread>0&&<span className="rounded-full bg-[#D61E2B] px-3 py-2 text-xs font-bold">{unread} New</span>}</div><div role="tablist" aria-label="Inbox" className="flex shrink-0 gap-5 overflow-x-auto border-b border-white/15 px-4 [scrollbar-width:none]">{TABS.map(key=><button key={key} role="tab" aria-selected={tab===key} onClick={()=>setTab(key)} className={`shrink-0 border-b-2 py-3 text-sm font-semibold ${tab===key?'border-[#D61E2B] text-white':'border-transparent text-white/60'}`}>{key}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto">{tab==='Activities'?<Activities userId={userId} onRead={loadUnread}/>:<People userId={userId} mode={tab} searchOpen={searchOpen} setSearchOpen={setSearchOpen}/>}</div></div>;
 }
-
-function Activities({ userId, onUnreadChange }: { userId: string; onUnreadChange: () => void }) {
-  const [items, setItems] = useState<InboxNotification[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, AppProfile>>({});
-  const [titles, setTitles] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => {
-    const { data, error } = await supabase.from('social_notifications').select('*').eq('recipient_id', userId).order('created_at', { ascending: false }).limit(100);
-    if (error) { console.error('Could not load inbox activities:', error.message); setItems([]); setLoading(false); return; }
-    const rows = (data || []) as InboxNotification[];
-    setItems(rows);
-    const actorIds = [...new Set(rows.map((item) => item.actor_id).filter(Boolean))];
-    const videoIds = [...new Set(rows.map((item) => item.video_id).filter(Boolean))] as string[];
-    const [profileResult, videoResult] = await Promise.all([
-      actorIds.length ? supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', actorIds) : Promise.resolve({ data: [] }),
-      videoIds.length ? supabase.from('videos').select('id,title').in('id', videoIds) : Promise.resolve({ data: [] }),
-    ]);
-    setProfiles(Object.fromEntries((profileResult.data || []).map((p) => [p.id, p as AppProfile])));
-    setTitles(Object.fromEntries((videoResult.data || []).map((v) => [v.id, v.title || 'your video'])));
-    setLoading(false);
-    const unreadIds = rows.filter((item) => !item.read_at).map((item) => item.id);
-    if (unreadIds.length) {
-      const { error: updateError } = await supabase.from('social_notifications').update({ read_at: new Date().toISOString() }).in('id', unreadIds).eq('recipient_id', userId);
-      if (updateError) console.error('Could not mark inbox activities read:', updateError.message);
-      else onUnreadChange();
-    }
-  }, [userId, onUnreadChange]);
-  useEffect(() => { void load(); const channel = supabase.channel(`inbox-activities-${userId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'social_notifications', filter: `recipient_id=eq.${userId}` }, () => { void load(); }).subscribe(); return () => { void supabase.removeChannel(channel); }; }, [load, userId]);
-  if (loading) return <p className="py-12 text-center text-sm text-white/60">Loading activities…</p>;
-  if (!items.length) return <EmptyState text="No activities yet."/>;
-  return <div className="divide-y divide-white/10">{items.map((item) => { const p = profiles[item.actor_id]; const action = item.kind === 'like' ? 'liked' : item.kind === 'comment' ? 'commented on' : item.kind === 'follow' ? 'started following you' : 'shared'; return <article key={item.id} className="flex items-center gap-3 px-4 py-4"><Avatar name={p?.display_name || p?.username || 'ORNEX user'} size={42}/><p className="min-w-0 flex-1 text-sm"><strong>{p?.display_name || (p?.username ? `@${p.username}` : 'Someone')}</strong> {action}{item.kind !== 'follow' ? ` ${titles[item.video_id || ''] || 'your video'}` : ''}<span className="block text-xs text-white/50">{new Date(item.created_at).toLocaleString()}</span></p>{!item.read_at && <span aria-label="Unread" className="h-2 w-2 rounded-full bg-[#D61E2B]"/>}</article>; })}</div>;
+function Activities({userId,onRead}:{userId:string;onRead:()=>void}){const [rows,setRows]=useState<Notification[]>([]);const [profiles,setProfiles]=useState<Record<string,AppProfile>>({});const [loading,setLoading]=useState(true);
+ useEffect(()=>{let active=true;void (async()=>{const {data}=await supabase.from('social_notifications').select('*').eq('recipient_id',userId).order('created_at',{ascending:false}).limit(100);const list=(data||[]) as Notification[];if(!active)return;setRows(list);if(list.length){const ids=[...new Set(list.map(x=>x.actor_id).filter(Boolean))];const {data:people}=await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids);if(active)setProfiles(Object.fromEntries((people||[]).map(p=>[p.id,p as AppProfile])));const unreadIds=list.filter(x=>!x.read_at).map(x=>x.id);if(unreadIds.length){await supabase.from('social_notifications').update({read_at:new Date().toISOString()}).in('id',unreadIds);onRead();}}if(active)setLoading(false);})();return()=>{active=false;};},[userId,onRead]);
+ if(loading)return <p className="py-12 text-center text-white/60">Loading activities…</p>;if(!rows.length)return <Empty title="No activities yet."/>;return <div>{rows.map(row=>{const p=profiles[row.actor_id];const Icon=row.kind==='like'?Heart:row.kind==='comment'?MessageCircle:UserPlus;const action=row.kind==='like'?'liked your video':row.kind==='comment'?'commented on your video':'started following you';return <div key={row.id} className="flex items-center gap-3 border-b border-white/10 px-4 py-4"><Avatar profile={p} size="sm"/><p className="flex-1 text-sm"><b>{p?.display_name||p?.username||'Guest'}</b> {action}</p><Icon size={18} className="text-[#D61E2B]"/></div>;})}</div>;
 }
-
-function People({ userId, mode }: { userId: string; mode: Exclude<InboxTabKey, 'Activities'> }) {
-  const [rows, setRows] = useState<Follow[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, AppProfile>>({});
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<AppProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [following, followers] = await Promise.all([
-      supabase.from('follows').select('follower_id,following_id,created_at').eq('follower_id', userId),
-      supabase.from('follows').select('follower_id,following_id,created_at').eq('following_id', userId),
-    ]);
-    if (following.error || followers.error) console.error('Could not load inbox follows:', following.error?.message || followers.error?.message);
-    const ownFollowing = (following.data || []) as Follow[];
-    const ownFollowers = (followers.data || []) as Follow[];
-    const mutualIds = new Set(ownFollowing.map((f) => f.following_id).filter((id) => ownFollowers.some((f) => f.follower_id === id)));
-    const selected = mode === 'Following' ? ownFollowing : mode === 'Followers' || mode === 'Requests' ? ownFollowers : ownFollowing.filter((f) => mutualIds.has(f.following_id));
-    const peopleIds = [...new Set(selected.map((f) => mode === 'Following' || mode === 'Friends' ? f.following_id : f.follower_id))];
-    setRows(selected);
-    if (peopleIds.length) {
-      const { data, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', peopleIds);
-      if (error) console.error('Could not load inbox profiles:', error.message);
-      const indexed = Object.fromEntries((data || []).map((p) => [p.id, p as AppProfile])); setProfiles(indexed);
-    } else setProfiles({});
-    setLoading(false);
-  }, [userId, mode]);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    const term = query.trim().replace(/^@/, '');
-    if (!term) { setResults([]); return; }
-    const timer = window.setTimeout(() => { void supabase.from('profiles').select('id,username,display_name,avatar_url').neq('id', userId).ilike('username', `%${term}%`).limit(20).then(({ data, error }) => { if (error) console.error('User search failed:', error.message); setResults((data || []) as AppProfile[]); }); }, 250);
-    return () => window.clearTimeout(timer);
-  }, [query, userId]);
-  const displayed = mode === 'Friends' && query.trim() ? results : rows.map((row) => profiles[mode === 'Following' || mode === 'Friends' ? row.following_id : row.follower_id]).filter(Boolean) as AppProfile[];
-  const friendHeader = mode === 'Friends';
-  const emptyTitle = friendHeader ? 'No friends found' : mode === 'Requests' ? 'No follow requests' : `No ${mode.toLowerCase()} yet`;
-  if (loading) return <p className="py-12 text-center text-sm text-white/60">Loading…</p>;
-  return <section>
-    {friendHeader && <label className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2"><Search className="h-4 w-4 text-white/60"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search for users to connect with" className="min-w-0 flex-1 bg-transparent text-sm outline-none"/></label>}
-    {!displayed.length ? <div className="flex flex-col items-center px-6 py-14 text-center"><Users className="mb-3 h-9 w-9 text-white/40"/><h2 className="font-semibold">{emptyTitle}</h2><p className="mt-1 text-sm text-white/60">{friendHeader ? 'Search for users to connect with' : 'People you connect with will show up here.'}</p></div> : <div className="divide-y divide-white/10">{displayed.map((person) => <div key={person.id} className="flex items-center gap-3 px-4 py-3"><Avatar name={person.display_name || person.username || 'ORNEX user'} size={42}/><div className="min-w-0"><p className="truncate text-sm font-semibold">{person.display_name || person.username}</p><p className="truncate text-xs text-white/55">@{person.username}</p></div>{mode === 'Friends' && query.trim() && <button className="ml-auto rounded-full bg-[#D61E2B] px-4 py-1.5 text-xs font-bold" onClick={async () => { const { error } = await supabase.from('follows').insert({ follower_id: userId, following_id: person.id }); if (error) console.error('Could not follow user:', error.message); else { setQuery(''); await load(); } }}>Follow</button>}</div>)}</div>}
-  </section>;
+function People({userId,mode,searchOpen,setSearchOpen}:{userId:string;mode:Exclude<InboxTabKey,'Activities'>;searchOpen:boolean;setSearchOpen:(open:boolean)=>void}){const [following,setFollowing]=useState<string[]>([]);const [followers,setFollowers]=useState<string[]>([]);const [profiles,setProfiles]=useState<AppProfile[]>([]);const [query,setQuery]=useState('');const [results,setResults]=useState<AppProfile[]>([]);const [loading,setLoading]=useState(true);
+ useEffect(()=>{let active=true;void Promise.all([supabase.from('follows').select('follower_id,following_id').eq('follower_id',userId),supabase.from('follows').select('follower_id,following_id').eq('following_id',userId)]).then(async([a,b])=>{const followingIds=(a.data||[]).map(x=>x.following_id);const followerIds=(b.data||[]).map(x=>x.follower_id);if(!active)return;setFollowing(followingIds);setFollowers(followerIds);const ids=mode==='Following'?followingIds:mode==='Followers'?followerIds:mode==='Friends'?followingIds.filter(id=>followerIds.includes(id)):[];if(ids.length){const {data}=await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids);if(active)setProfiles((data||[]) as AppProfile[]);}else setProfiles([]);if(active)setLoading(false);});return()=>{active=false;};},[userId,mode]);
+ useEffect(()=>{const term=query.trim().replace(/^@/,'');if(!term){setResults([]);return;}const timer=setTimeout(()=>{void supabase.from('profiles').select('id,username,display_name,avatar_url').neq('id',userId).ilike('username',`%${term}%`).limit(20).then(({data})=>setResults((data||[]) as AppProfile[]));},250);return()=>clearTimeout(timer);},[query,userId]);
+ const people=mode==='Friends'&&query?results:profiles;const empty=mode==='Friends'?'No friends found':mode==='Requests'?'No requests yet':`No ${mode.toLowerCase()} yet`;
+ const toggleFollow=async(person:AppProfile)=>{const follows=following.includes(person.id);if(follows){setFollowing(current=>current.filter(id=>id!==person.id));await supabase.from('follows').delete().eq('follower_id',userId).eq('following_id',person.id);}else{setFollowing(current=>[...current,person.id]);await supabase.from('follows').insert({follower_id:userId,following_id:person.id});}};
+ return <section className="px-4 py-3">{(mode==='Friends'||searchOpen)&&<div className="mb-4"><label className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search for users" className="min-w-0 flex-1 bg-transparent text-sm outline-none"/></label>{mode==='Friends'&&!query&&<div className="flex flex-col items-center py-12 text-center"><Users size={36} className="mb-3 text-white/40"/><h2 className="font-bold">No friends found</h2><p className="mt-1 text-sm text-white/60">Search for users to connect with</p><button onClick={()=>{setSearchOpen(true);document.querySelector<HTMLInputElement>('input[placeholder="Search for users"]')?.focus();}} className="mt-4 rounded-full bg-[#D61E2B] px-5 py-2 text-sm font-bold">Search</button></div>}</div>}
+ {loading&&<p className="py-8 text-center text-white/50">Loading…</p>}{!loading&&people.length===0&&!(mode==='Friends'&&!query)&&<Empty title={empty}/ >}{people.map(person=><div key={person.id} className="flex items-center gap-3 border-b border-white/10 py-3"><Avatar profile={person} size="sm"/><div className="min-w-0 flex-1"><p className="truncate font-semibold">{person.display_name}</p><p className="text-sm text-white/60">@{person.username}</p></div>{mode!=='Followers'&&mode!=='Requests'&&<button onClick={()=>void toggleFollow(person)} className="rounded-full bg-[#D61E2B] px-3 py-2 text-xs font-bold">{following.includes(person.id)?'Following':'Follow'}</button>}</div>)}</section>;
 }
-function EmptyState({ text }: { text: string }) { return <div className="flex flex-col items-center justify-center px-6 py-16 text-center"><Bell className="mb-3 h-9 w-9 text-white/40"/><p className="text-sm text-white/60">{text}</p></div>; }
+function Empty({title}:{title:string}){return <div className="flex flex-col items-center px-6 py-14 text-center"><Bell className="mb-3 h-9 w-9 text-white/40"/><p className="font-semibold">{title}</p></div>}

@@ -1,76 +1,33 @@
 import { supabase } from './supabase';
 
-export type AppProfile = {
-  id: string;
-  username: string;
-  display_name: string;
-  avatar_url?: string | null;
-};
+const ID_KEY = 'ornex_guest_id';
+const PROFILE_KEY = 'ornex_guest_profile';
+export type AppProfile = { id: string; username: string; display_name: string; avatar_url?: string | null };
+export type GuestProfile = AppProfile & { bio?: string };
 
-export let currentAuthUser: any = null;
-
-export async function getCurrentAuthUser() {
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    currentAuthUser = data.user ?? null;
-  } catch {
-    // Treat auth/network failures as a signed-out guest session.
-    currentAuthUser = null;
+function readProfile(): GuestProfile | null {
+  try { const raw = localStorage.getItem(PROFILE_KEY); return raw ? JSON.parse(raw) as GuestProfile : null; } catch { return null; }
+}
+function writeProfile(profile: GuestProfile) { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch { /* storage may be disabled */ } }
+export function getGuestProfile(): GuestProfile {
+  let id = '';
+  try { id = localStorage.getItem(ID_KEY) || ''; } catch { /* use in-memory identity */ }
+  if (!id) {
+    id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try { localStorage.setItem(ID_KEY, id); } catch { /* ignore */ }
   }
-  return currentAuthUser;
+  const existing = readProfile();
+  if (existing?.id === id) return existing;
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  const profile = { id, username: `Guest_${suffix}`, display_name: `Guest_${suffix}`, avatar_url: null, bio: '' };
+  writeProfile(profile);
+  return profile;
 }
-
-export async function getCurrentUserId(): Promise<string | null> {
-  try {
-    const user = await getCurrentAuthUser();
-    return user?.id ?? null;
-  } catch {
-    return null;
-  }
+export function saveGuestProfile(updates: Partial<GuestProfile>): GuestProfile {
+  const profile = { ...getGuestProfile(), ...updates };
+  writeProfile(profile);
+  void supabase.from('profiles').upsert({ id: profile.id, username: profile.username, display_name: profile.display_name, avatar_url: profile.avatar_url, bio: profile.bio || '' }, { onConflict: 'id' });
+  return profile;
 }
-
-export async function getOrCreateCurrentProfile(userId?: string): Promise<AppProfile | null> {
-  try {
-    const user = userId ? { id: userId } as any : await getCurrentAuthUser();
-    if (!user) return null;
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (data) return data as AppProfile;
-    const { data: authUser } = await supabase.auth.getUser();
-    const email = authUser.user?.email || '';
-    const username = (email.split('@')[0] || 'user') + Math.floor(Math.random() * 1000);
-    const { data: created } = await supabase.from('profiles').insert({
-      id: user.id, username, display_name: username, avatar_url: null,
-    }).select().single();
-    return (created as AppProfile) ?? null;
-  } catch {
-    // Profile creation is optional; the UI can continue in guest mode.
-    return null;
-  }
-}
-
-export async function signUp(email: string, password: string, username: string) {
-  const { data, error } = await supabase.auth.signUp({
-    email, password, options: { data: { username: username.trim() } }
-  });
-  if (error) throw error;
-  currentAuthUser = data.user;
-  if (data.user && data.session) {
-    await getOrCreateCurrentProfile(data.user.id);
-  }
-  return data;
-}
-
-export async function signInWithPassword(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  currentAuthUser = data.user;
-  await getOrCreateCurrentProfile(data.user?.id);
-  return data;
-}
-
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-  currentAuthUser = null;
-}
+export async function getCurrentUserId(): Promise<string> { return getGuestProfile().id; }
+export async function getOrCreateCurrentProfile(): Promise<GuestProfile> { return getGuestProfile(); }
